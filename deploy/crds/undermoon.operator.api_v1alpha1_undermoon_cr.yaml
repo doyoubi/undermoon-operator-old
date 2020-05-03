@@ -1,0 +1,7 @@
+apiVersion: undermoon.operator.api/v1alpha1
+kind: Undermoon
+metadata:
+  name: example-undermoon
+spec:
+  # Add fields here
+  size: 3
