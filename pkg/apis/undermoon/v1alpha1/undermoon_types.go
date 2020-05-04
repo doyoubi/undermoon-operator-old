@@ -14,6 +14,7 @@ type UndermoonSpec struct {
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 
 	// Each chunk has 2 masters and 2 replicas. This field is used to specify node number of the cluster.
+	// +kubebuilder:validation:Minimum=1
 	ChunkNumber uint32 `json:"chunkNumber"`
 }
 

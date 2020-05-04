@@ -35,6 +35,7 @@ spec:
               description: Each chunk has 2 masters and 2 replicas. This field is
                 used to specify node number of the cluster.
               format: int32
+              minimum: 1
               type: integer
           required:
           - chunkNumber
