@@ -37,8 +37,13 @@ spec:
               format: int32
               minimum: 1
               type: integer
+            clusterName:
+              maxLength: 30
+              minLength: 1
+              type: string
           required:
           - chunkNumber
+          - clusterName
           type: object
         status:
           description: UndermoonStatus defines the observed state of Undermoon

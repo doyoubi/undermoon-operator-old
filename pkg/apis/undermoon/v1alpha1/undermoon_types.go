@@ -13,6 +13,9 @@ type UndermoonSpec struct {
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 
+	// +kubebuilder:validation:MaxLength=30
+	// +kubebuilder:validation:MinLength=1
+	ClusterName string `json:"clusterName"`
 	// Each chunk has 2 masters and 2 replicas. This field is used to specify node number of the cluster.
 	// +kubebuilder:validation:Minimum=1
 	ChunkNumber uint32 `json:"chunkNumber"`
