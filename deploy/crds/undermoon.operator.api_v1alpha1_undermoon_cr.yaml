@@ -3,5 +3,6 @@ kind: Undermoon
 metadata:
   name: example-undermoon
 spec:
-  # Add fields here
-  size: 3
+  clusterName: example-cluster
+  chunkNumber: 1
+  undermoonImage: doyoubi/undermoon:0.3.0-buster

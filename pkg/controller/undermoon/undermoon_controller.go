@@ -2,16 +2,14 @@ package undermoon
 
 import (
 	"context"
+	"time"
 
 	undermoonv1alpha1 "github.com/doyoubi/undermoon-operator/pkg/apis/undermoon/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -34,7 +32,12 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileUndermoon{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	r := &ReconcileUndermoon{
+		client: mgr.GetClient(),
+		scheme: mgr.GetScheme(),
+	}
+	r.brokerCon = newBrokerController(r)
+	return r
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -71,8 +74,9 @@ var _ reconcile.Reconciler = &ReconcileUndermoon{}
 type ReconcileUndermoon struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
+	client    client.Client
+	scheme    *runtime.Scheme
+	brokerCon *memBrokerController
 }
 
 // Reconcile reads that state of the cluster for a Undermoon object and makes changes based on the state read
@@ -100,54 +104,15 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	// Define a new Pod object
-	pod := newPodForCR(instance)
-
-	// Set Undermoon instance as the owner and controller
-	if err := controllerutil.SetControllerReference(instance, pod, r.scheme); err != nil {
+	brokerStatefulset, err := r.brokerCon.reconcileBroker(reqLogger, instance)
+	if err != nil {
+		reqLogger.Error(err, "failed to reconcile broker", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return reconcile.Result{}, err
 	}
-
-	// Check if this Pod already exists
-	found := &corev1.Pod{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)
-		err = r.client.Create(context.TODO(), pod)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-
-		// Pod created successfully - don't requeue
-		return reconcile.Result{}, nil
-	} else if err != nil {
-		return reconcile.Result{}, err
+	if !r.brokerCon.brokerReady(brokerStatefulset) {
+		reqLogger.Info("broker statefulset not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
 	}
 
-	// Pod already exists - don't requeue
-	reqLogger.Info("Skip reconcile: Pod already exists", "Pod.Namespace", found.Namespace, "Pod.Name", found.Name)
 	return reconcile.Result{}, nil
-}
-
-// newPodForCR returns a busybox pod with the same name/namespace as the cr
-func newPodForCR(cr *undermoonv1alpha1.Undermoon) *corev1.Pod {
-	labels := map[string]string{
-		"app": cr.Name,
-	}
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name + "-pod",
-			Namespace: cr.Namespace,
-			Labels:    labels,
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:    "busybox",
-					Image:   "busybox",
-					Command: []string{"sleep", "3600"},
-				},
-			},
-		},
-	}
 }

@@ -41,9 +41,12 @@ spec:
               maxLength: 30
               minLength: 1
               type: string
+            undermoonImage:
+              type: string
           required:
           - chunkNumber
           - clusterName
+          - undermoonImage
           type: object
         status:
           description: UndermoonStatus defines the observed state of Undermoon
