@@ -5,7 +5,8 @@ import (
 	"time"
 
 	undermoonv1alpha1 "github.com/doyoubi/undermoon-operator/pkg/apis/undermoon/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/go-logr/logr"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,6 +38,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		scheme: mgr.GetScheme(),
 	}
 	r.brokerCon = newBrokerController(r)
+	r.coodinatorCon = newCoordinatorController(r)
 	return r
 }
 
@@ -56,7 +58,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Pods and requeue the owner Undermoon
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &undermoonv1alpha1.Undermoon{},
 	})
@@ -74,9 +76,10 @@ var _ reconcile.Reconciler = &ReconcileUndermoon{}
 type ReconcileUndermoon struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client    client.Client
-	scheme    *runtime.Scheme
-	brokerCon *memBrokerController
+	client        client.Client
+	scheme        *runtime.Scheme
+	brokerCon     *memBrokerController
+	coodinatorCon *coordinatorController
 }
 
 // Reconcile reads that state of the cluster for a Undermoon object and makes changes based on the state read
@@ -104,15 +107,34 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	brokerStatefulset, err := r.brokerCon.reconcileBroker(reqLogger, instance)
+	brokerStatefulSet, err := r.brokerCon.reconcileBroker(reqLogger, instance)
 	if err != nil {
 		reqLogger.Error(err, "failed to reconcile broker", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return reconcile.Result{}, err
 	}
-	if !r.brokerCon.brokerReady(brokerStatefulset) {
-		reqLogger.Info("broker statefulset not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+
+	coordinatorStatefulSet, err := r.coodinatorCon.reconcileCoordinator(reqLogger, instance)
+	if err != nil {
+		reqLogger.Error(err, "failed to reconcile coordiantor", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return reconcile.Result{}, err
+	}
+
+	if !r.resourceReady(brokerStatefulSet, coordinatorStatefulSet, reqLogger, instance) {
 		return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileUndermoon) resourceReady(brokerStatefulSet *appsv1.StatefulSet, coordinatorStatefulSet *appsv1.StatefulSet, reqLogger logr.Logger, instance *undermoonv1alpha1.Undermoon) bool {
+	if !r.brokerCon.brokerReady(brokerStatefulSet) {
+		reqLogger.Info("broker statefulset not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return false
+	}
+
+	if !r.coodinatorCon.coordinatorReady(coordinatorStatefulSet) {
+		reqLogger.Info("coordinator statefulset not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return false
+	}
+	return true
 }

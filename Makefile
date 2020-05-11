@@ -6,9 +6,8 @@ update-types:
 	operator-sdk generate k8s
 	operator-sdk generate crds
 
-minikube-env:
-	minikube start --vm-driver hyperkit --memory='3GB'
-	# eval $(minikube docker-env)
+kind-env:
+	kind create cluster
 
 debug-run:
 	kubectl create -f deploy/crds/undermoon.operator.api_undermoons_crd.yaml

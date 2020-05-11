@@ -12,8 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-const brokerPort = 7799
-
 type memBrokerController struct {
 	r *ReconcileUndermoon
 }
@@ -30,7 +28,7 @@ func (con *memBrokerController) reconcileBroker(reqLogger logr.Logger, cr *under
 
 	brokerStatefulSet, err := con.getOrCreateBrokerStatefulSet(reqLogger, cr)
 	if err != nil {
-		reqLogger.Error(err, "failed to create etcd statefulset", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		reqLogger.Error(err, "failed to create broker statefulset", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return nil, err
 	}
 
@@ -97,5 +95,9 @@ func (con *memBrokerController) getOrCreateBrokerStatefulSet(reqLogger logr.Logg
 }
 
 func (con *memBrokerController) brokerReady(brokerStatefulSet *appsv1.StatefulSet) bool {
+	return brokerStatefulSet.Status.ReadyReplicas >= brokerNum-1
+}
+
+func (con *memBrokerController) brokerAllReady(brokerStatefulSet *appsv1.StatefulSet) bool {
 	return brokerStatefulSet.Status.ReadyReplicas == brokerNum
 }

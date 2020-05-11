@@ -9,30 +9,30 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const brokerPort = 7799
-const brokerNum int32 = 3
-const brokerContainerName = "broker"
+const coordinatorPort = 6699
+const coordinatorNum int32 = 3
+const coordinatorContainerName = "coordinator"
 
-func createBrokerService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
+func createCoordinatorService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 	undermoonName := cr.ObjectMeta.Name
 
 	labels := map[string]string{
-		"undermoonService":     "broker",
+		"undermoonService":     "coordinator",
 		"undermoonName":        undermoonName,
 		"undermoonClusterName": cr.Spec.ClusterName,
 	}
 
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      BrokerServiceName(undermoonName),
+			Name:      CoordinatorServiceName(undermoonName),
 			Namespace: cr.Namespace,
 			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Name:     "broker-port",
-					Port:     brokerPort,
+					Name:     "coordinator-port",
+					Port:     coordinatorPort,
 					Protocol: corev1.ProtocolTCP,
 				},
 			},
@@ -42,14 +42,14 @@ func createBrokerService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 	}
 }
 
-// BrokerServiceName defines the service for broker statefulsets.
-func BrokerServiceName(clusterName string) string {
-	return fmt.Sprintf("%s-broker-svc", clusterName)
+// CoordinatorServiceName defines the service for coordinator statefulsets.
+func CoordinatorServiceName(clusterName string) string {
+	return fmt.Sprintf("%s-coordinator-svc", clusterName)
 }
 
-func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSet {
+func createCoordinatorStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSet {
 	labels := map[string]string{
-		"undermoonService":     "broker",
+		"undermoonService":     "coordinator",
 		"undermoonName":        cr.ObjectMeta.Name,
 		"undermoonClusterName": cr.Spec.ClusterName,
 	}
@@ -57,58 +57,34 @@ func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSe
 	env := []corev1.EnvVar{
 		{
 			Name:  "RUST_LOG",
-			Value: "undermoon=info,mem_broker=info",
+			Value: "undermoon=info,coordinator=info",
 		},
 		{
 			Name:  "UNDERMOON_ADDRESS",
-			Value: "0.0.0.0:7799",
+			Value: "0.0.0.0:6699",
 		},
 		{
-			Name:  "UNDERMOON_FAILURE_TTL",
-			Value: "60",
-		},
-		{
-			Name:  "UNDERMOON_FAILURE_QUORUM",
-			Value: "2",
-		},
-		{
-			Name:  "UNDERMOON_MIGRATION_LIMIT",
-			Value: "2",
-		},
-		{
-			Name:  "UNDERMOON_RECOVER_FROM_META_FILE",
-			Value: "true",
-		},
-		{
-			Name:  "UNDERMOON_META_FILENAME",
-			Value: "metadata",
-		},
-		{
-			Name:  "UNDERMOON_AUTO_UPDATE_META_FILE",
-			Value: "true",
-		},
-		{
-			Name:  "UNDERMOON_UPDATE_META_FILE_INTERVAL",
-			Value: "10",
-		},
-		{
-			Name:  "UNDERMOON_REPLICA_ADDRESSES",
+			Name:  "UNDERMOON_BROKER_ADDRESS",
 			Value: "",
 		},
 		{
-			Name:  "UNDERMOON_SYNC_META_INTERVAL",
-			Value: "5",
+			Name: "UNDERMOON_REPORTER_ID",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.name",
+				},
+			},
 		},
 		{
-			Name:  "UNDERMOON_DEBUG",
-			Value: "false",
+			Name:  "UNDERMOON_THREAD_NUMBER",
+			Value: "2",
 		},
 	}
 	container := corev1.Container{
-		Name:            brokerContainerName,
+		Name:            coordinatorContainerName,
 		Image:           cr.Spec.UndermoonImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command:         []string{"mem_broker"},
+		Command:         []string{"coordinator"},
 		Env:             env,
 	}
 	podSpec := corev1.PodTemplateSpec{
@@ -120,7 +96,7 @@ func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSe
 		},
 	}
 
-	replicaNum := brokerNum
+	replicaNum := coordinatorNum
 
 	return &appsv1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
@@ -128,13 +104,13 @@ func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSe
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      BrokerStatefulSetName(cr.ObjectMeta.Name),
+			Name:      CoordinatorStatefulSetName(cr.ObjectMeta.Name),
 			Namespace: cr.Namespace,
 			Labels:    labels,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Selector:            &metav1.LabelSelector{MatchLabels: labels},
-			ServiceName:         BrokerServiceName(cr.ObjectMeta.Name),
+			ServiceName:         CoordinatorServiceName(cr.ObjectMeta.Name),
 			Replicas:            &replicaNum,
 			Template:            podSpec,
 			PodManagementPolicy: appsv1.ParallelPodManagement,
@@ -142,7 +118,7 @@ func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSe
 	}
 }
 
-// BrokerStatefulSetName defines the statefulset for memory broker.
-func BrokerStatefulSetName(undermoonName string) string {
-	return fmt.Sprintf("%s-broker-ss", undermoonName)
+// CoordinatorStatefulSetName defines the statefulset for memory coordinator.
+func CoordinatorStatefulSetName(undermoonName string) string {
+	return fmt.Sprintf("%s-coordinator-ss", undermoonName)
 }
