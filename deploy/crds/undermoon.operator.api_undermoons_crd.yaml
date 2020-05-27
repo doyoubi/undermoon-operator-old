@@ -50,6 +50,13 @@ spec:
           type: object
         status:
           description: UndermoonStatus defines the observed state of Undermoon
+          properties:
+            masterBrokerAddress:
+              description: Master broker address pointing to the master broker.
+              minLength: 1
+              type: string
+          required:
+          - masterBrokerAddress
           type: object
       type: object
   version: v1alpha1

@@ -146,3 +146,27 @@ func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSe
 func BrokerStatefulSetName(undermoonName string) string {
 	return fmt.Sprintf("%s-broker-ss", undermoonName)
 }
+
+func genBrokerNames(clusterName string) []string {
+	names := []string{}
+	for i := int32(0); i != brokerNum; i++ {
+		name := fmt.Sprintf("%s-%d", BrokerStatefulSetName(clusterName), i)
+		names = append(names, name)
+	}
+	return names
+}
+
+func genBrokerFQDN(brokerName, clusterName, namespace string) string {
+	// pod-specific-string.serviceName.default.svc.cluster.local
+	return fmt.Sprintf("%s.%s.%s.svc.cluster.local", brokerName, BrokerServiceName(clusterName), namespace)
+}
+
+func genBrokerStatefulSetAddrs(cr *undermoonv1alpha1.Undermoon) []string {
+	addrs := []string{}
+	for _, name := range genBrokerNames(cr.ObjectMeta.Name) {
+		host := genBrokerFQDN(name, cr.ObjectMeta.Name, cr.ObjectMeta.Namespace)
+		addr := fmt.Sprintf("%s:%d", host, brokerPort)
+		addrs = append(addrs, addr)
+	}
+	return addrs
+}
