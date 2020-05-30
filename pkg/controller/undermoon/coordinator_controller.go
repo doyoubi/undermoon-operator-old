@@ -21,6 +21,10 @@ func newCoordinatorController(r *ReconcileUndermoon) *coordinatorController {
 }
 
 func (con *coordinatorController) reconcileCoordinator(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, error) {
+	return con.createCoordinator(reqLogger, cr)
+}
+
+func (con *coordinatorController) createCoordinator(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, error) {
 	if _, err := con.getOrCreateCoordinatorService(reqLogger, cr); err != nil {
 		reqLogger.Error(err, "failed to create coordinator service", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return nil, err
@@ -78,7 +82,11 @@ func (con *coordinatorController) getOrCreateCoordinatorStatefulSet(reqLogger lo
 		reqLogger.Info("Creating a new coordinator statefulset", "Namespace", coordinator.Namespace, "Name", coordinator.Name)
 		err = con.r.client.Create(context.TODO(), coordinator)
 		if err != nil {
-			reqLogger.Error(err, "failed to create coordinator statefulset")
+			if errors.IsAlreadyExists(err) {
+				reqLogger.Info("coordinator statefulset already exists")
+			} else {
+				reqLogger.Error(err, "failed to create coordinator statefulset")
+			}
 			return nil, err
 		}
 

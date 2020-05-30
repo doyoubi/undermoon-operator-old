@@ -107,32 +107,55 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	brokerStatefulSet, err := r.brokerCon.reconcileBroker(reqLogger, instance)
+	resource, err := r.createResources(reqLogger, instance)
 	if err != nil {
-		reqLogger.Error(err, "failed to reconcile broker", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return reconcile.Result{}, err
 	}
 
-	coordinatorStatefulSet, err := r.coodinatorCon.reconcileCoordinator(reqLogger, instance)
-	if err != nil {
-		reqLogger.Error(err, "failed to reconcile coordiantor", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
-		return reconcile.Result{}, err
-	}
-
-	if !r.resourceReady(brokerStatefulSet, coordinatorStatefulSet, reqLogger, instance) {
+	if !r.resourceReady(resource, reqLogger, instance) {
 		return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
+	}
+
+	_, err = r.brokerCon.reconcileMaster(reqLogger, instance, resource.brokerStatefulSet)
+	if err != nil {
+		reqLogger.Error(err, "failed to get current broker master", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return reconcile.Result{}, err
 	}
 
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileUndermoon) resourceReady(brokerStatefulSet *appsv1.StatefulSet, coordinatorStatefulSet *appsv1.StatefulSet, reqLogger logr.Logger, instance *undermoonv1alpha1.Undermoon) bool {
-	if !r.brokerCon.brokerReady(brokerStatefulSet) {
+type umResource struct {
+	brokerStatefulSet      *appsv1.StatefulSet
+	coordinatorStatefulSet *appsv1.StatefulSet
+}
+
+func (r *ReconcileUndermoon) createResources(reqLogger logr.Logger, instance *undermoonv1alpha1.Undermoon) (*umResource, error) {
+	brokerStatefulSet, err := r.brokerCon.createBroker(reqLogger, instance)
+	if err != nil {
+		reqLogger.Error(err, "failed to create broker", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return nil, err
+	}
+
+	coordinatorStatefulSet, err := r.coodinatorCon.createCoordinator(reqLogger, instance)
+	if err != nil {
+		reqLogger.Error(err, "failed to create coordiantor", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return nil, err
+	}
+
+	return &umResource{
+		brokerStatefulSet:      brokerStatefulSet,
+		coordinatorStatefulSet: coordinatorStatefulSet,
+	}, nil
+}
+
+func (r *ReconcileUndermoon) resourceReady(resource *umResource, reqLogger logr.Logger, instance *undermoonv1alpha1.Undermoon) bool {
+	if !r.brokerCon.brokerReady(resource.brokerStatefulSet) {
 		reqLogger.Info("broker statefulset not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return false
 	}
 
-	if !r.coodinatorCon.coordinatorReady(coordinatorStatefulSet) {
+	if !r.coodinatorCon.coordinatorReady(resource.coordinatorStatefulSet) {
 		reqLogger.Info("coordinator statefulset not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return false
 	}

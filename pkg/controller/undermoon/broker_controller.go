@@ -24,6 +24,10 @@ func newBrokerController(r *ReconcileUndermoon) *memBrokerController {
 }
 
 func (con *memBrokerController) reconcileBroker(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, error) {
+	return con.createBroker(reqLogger, cr)
+}
+
+func (con *memBrokerController) createBroker(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, error) {
 	if _, err := con.getOrCreateBrokerService(reqLogger, cr); err != nil {
 		reqLogger.Error(err, "failed to create broker service", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return nil, err
@@ -81,7 +85,11 @@ func (con *memBrokerController) getOrCreateBrokerStatefulSet(reqLogger logr.Logg
 		reqLogger.Info("Creating a new broker statefulset", "Namespace", broker.Namespace, "Name", broker.Name)
 		err = con.r.client.Create(context.TODO(), broker)
 		if err != nil {
-			reqLogger.Error(err, "failed to create broker statefulset")
+			if errors.IsAlreadyExists(err) {
+				reqLogger.Info("broker statefulset already exists")
+			} else {
+				reqLogger.Error(err, "failed to create broker statefulset")
+			}
 			return nil, err
 		}
 
