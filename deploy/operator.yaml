@@ -16,7 +16,7 @@ spec:
       containers:
         - name: undermoon-operator
           # Replace this with the built image name
-          image: REPLACE_IMAGE
+          image: localhost:5000/undermoon-operator:v0.0.1
           command:
           - undermoon-operator
           imagePullPolicy: Always

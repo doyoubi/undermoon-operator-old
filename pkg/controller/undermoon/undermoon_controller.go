@@ -7,6 +7,7 @@ import (
 	undermoonv1alpha1 "github.com/doyoubi/undermoon-operator/pkg/apis/undermoon/v1alpha1"
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -112,13 +113,16 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	if !r.resourceReady(resource, reqLogger, instance) {
+	ready, err := r.resourceReady(resource, reqLogger, instance)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	if !ready {
 		return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
 	}
 
-	_, err = r.brokerCon.reconcileMaster(reqLogger, instance, resource.brokerStatefulSet)
+	_, err = r.brokerCon.reconcileMaster(reqLogger, instance, resource.brokerStatefulSet, resource.brokerService)
 	if err != nil {
-		reqLogger.Error(err, "failed to get current broker master", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return reconcile.Result{}, err
 	}
 
@@ -128,16 +132,18 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 type umResource struct {
 	brokerStatefulSet      *appsv1.StatefulSet
 	coordinatorStatefulSet *appsv1.StatefulSet
+	brokerService          *corev1.Service
+	coordinatorService     *corev1.Service
 }
 
 func (r *ReconcileUndermoon) createResources(reqLogger logr.Logger, instance *undermoonv1alpha1.Undermoon) (*umResource, error) {
-	brokerStatefulSet, err := r.brokerCon.createBroker(reqLogger, instance)
+	brokerStatefulSet, brokerService, err := r.brokerCon.createBroker(reqLogger, instance)
 	if err != nil {
 		reqLogger.Error(err, "failed to create broker", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return nil, err
 	}
 
-	coordinatorStatefulSet, err := r.coodinatorCon.createCoordinator(reqLogger, instance)
+	coordinatorStatefulSet, coordinatorService, err := r.coodinatorCon.createCoordinator(reqLogger, instance)
 	if err != nil {
 		reqLogger.Error(err, "failed to create coordiantor", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return nil, err
@@ -146,18 +152,30 @@ func (r *ReconcileUndermoon) createResources(reqLogger logr.Logger, instance *un
 	return &umResource{
 		brokerStatefulSet:      brokerStatefulSet,
 		coordinatorStatefulSet: coordinatorStatefulSet,
+		brokerService:          brokerService,
+		coordinatorService:     coordinatorService,
 	}, nil
 }
 
-func (r *ReconcileUndermoon) resourceReady(resource *umResource, reqLogger logr.Logger, instance *undermoonv1alpha1.Undermoon) bool {
-	if !r.brokerCon.brokerReady(resource.brokerStatefulSet) {
+func (r *ReconcileUndermoon) resourceReady(resource *umResource, reqLogger logr.Logger, instance *undermoonv1alpha1.Undermoon) (bool, error) {
+	ready, err := r.brokerCon.brokerReady(resource.brokerStatefulSet, resource.brokerService)
+	if err != nil {
+		reqLogger.Error(err, "failed to check broker ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return false, err
+	}
+	if !ready {
 		reqLogger.Info("broker statefulset not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
-		return false
+		return false, nil
 	}
 
-	if !r.coodinatorCon.coordinatorReady(resource.coordinatorStatefulSet) {
-		reqLogger.Info("coordinator statefulset not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
-		return false
+	ready, err = r.coodinatorCon.coordinatorReady(resource.coordinatorStatefulSet, resource.coordinatorService)
+	if err != nil {
+		reqLogger.Error(err, "failed to check coordinator ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return false, err
 	}
-	return true
+	if !ready {
+		reqLogger.Info("coordinator statefulset not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return false, nil
+	}
+	return true, nil
 }

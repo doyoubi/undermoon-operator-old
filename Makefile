@@ -16,10 +16,20 @@ kind-env:
 list-images:
 	curl http://localhost:5000/v2/_catalog
 
+docker-debug-build:
+	operator-sdk build localhost:5000/undermoon-operator:v0.0.1
+	docker push localhost:5000/undermoon-operator:v0.0.1
+
 debug-run:
 	kubectl create -f deploy/crds/undermoon.operator.api_undermoons_crd.yaml
-	export OPERATOR_NAME=undermoon-operator
-	operator-sdk run --local --watch-namespace=default
+	# run operator
+	kubectl create -f deploy/service_account.yaml
+	kubectl create -f deploy/role.yaml
+	kubectl create -f deploy/role_binding.yaml
+	kubectl create -f deploy/operator.yaml
+
+debug-logs:
+	./scripts/operator_logs.sh
 
 debug-start:
 	kubectl apply -f deploy/crds/undermoon.operator.api_v1alpha1_undermoon_cr.yaml

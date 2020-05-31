@@ -20,23 +20,24 @@ func newCoordinatorController(r *ReconcileUndermoon) *coordinatorController {
 	return &coordinatorController{r: r}
 }
 
-func (con *coordinatorController) reconcileCoordinator(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, error) {
-	return con.createCoordinator(reqLogger, cr)
-}
-
-func (con *coordinatorController) createCoordinator(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, error) {
-	if _, err := con.getOrCreateCoordinatorService(reqLogger, cr); err != nil {
+func (con *coordinatorController) createCoordinator(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, *corev1.Service, error) {
+	coordinatorService, err := createServiceGuard(func() (*corev1.Service, error) {
+		return con.getOrCreateCoordinatorService(reqLogger, cr)
+	})
+	if err != nil {
 		reqLogger.Error(err, "failed to create coordinator service", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
-		return nil, err
+		return nil, nil, err
 	}
 
-	coordinatorStatefulSet, err := con.getOrCreateCoordinatorStatefulSet(reqLogger, cr)
+	coordinatorStatefulSet, err := createStatefulSetGuard(func() (*appsv1.StatefulSet, error) {
+		return con.getOrCreateCoordinatorStatefulSet(reqLogger, cr)
+	})
 	if err != nil {
 		reqLogger.Error(err, "failed to create coordinator statefulset", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
-		return nil, err
+		return nil, nil, err
 	}
 
-	return coordinatorStatefulSet, nil
+	return coordinatorStatefulSet, coordinatorService, nil
 }
 
 func (con *coordinatorController) getOrCreateCoordinatorService(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*corev1.Service, error) {
@@ -52,7 +53,11 @@ func (con *coordinatorController) getOrCreateCoordinatorService(reqLogger logr.L
 		reqLogger.Info("Creating a new coordinator service", "Namespace", service.Namespace, "Name", service.Name)
 		err = con.r.client.Create(context.TODO(), service)
 		if err != nil {
-			reqLogger.Error(err, "failed to create coordinator service")
+			if errors.IsAlreadyExists(err) {
+				reqLogger.Info("coordinator service already exists")
+			} else {
+				reqLogger.Error(err, "failed to create coordinator service")
+			}
 			return nil, err
 		}
 
@@ -102,10 +107,28 @@ func (con *coordinatorController) getOrCreateCoordinatorStatefulSet(reqLogger lo
 	return found, nil
 }
 
-func (con *coordinatorController) coordinatorReady(coordinatorStatefulSet *appsv1.StatefulSet) bool {
-	return coordinatorStatefulSet.Status.ReadyReplicas >= 1
+func (con *coordinatorController) getServiceEndpointsNum(coordinatorService *corev1.Service) (int, error) {
+	endpoints, err := getEndpoints(con.r.client, coordinatorService.Name, coordinatorService.Namespace)
+	if err != nil {
+		return 0, err
+	}
+	return len(endpoints), nil
 }
 
-func (con *coordinatorController) coordiantorAllReady(coordinatorStatefulSet *appsv1.StatefulSet) bool {
-	return coordinatorStatefulSet.Status.ReadyReplicas >= coordinatorNum
+func (con *coordinatorController) coordinatorReady(coordinatorStatefulSet *appsv1.StatefulSet, coordinatorService *corev1.Service) (bool, error) {
+	n, err := con.getServiceEndpointsNum(coordinatorService)
+	if err != nil {
+		return false, err
+	}
+	ready := coordinatorStatefulSet.Status.ReadyReplicas >= 1 && n >= 1
+	return ready, nil
+}
+
+func (con *coordinatorController) coordiantorAllReady(coordinatorStatefulSet *appsv1.StatefulSet, coordinatorService *corev1.Service) (bool, error) {
+	n, err := con.getServiceEndpointsNum(coordinatorService)
+	if err != nil {
+		return false, err
+	}
+	ready := coordinatorStatefulSet.Status.ReadyReplicas >= coordinatorNum && n >= int(coordinatorNum)
+	return ready, nil
 }

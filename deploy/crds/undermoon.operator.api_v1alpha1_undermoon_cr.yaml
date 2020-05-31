@@ -5,4 +5,4 @@ metadata:
 spec:
   clusterName: example-cluster
   chunkNumber: 1
-  undermoonImage: doyoubi/undermoon:0.3.0-buster
+  undermoonImage: localhost:5000/undermoon_test

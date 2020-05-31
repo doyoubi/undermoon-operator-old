@@ -23,23 +23,24 @@ func newBrokerController(r *ReconcileUndermoon) *memBrokerController {
 	return &memBrokerController{r: r, client: client}
 }
 
-func (con *memBrokerController) reconcileBroker(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, error) {
-	return con.createBroker(reqLogger, cr)
-}
-
-func (con *memBrokerController) createBroker(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, error) {
-	if _, err := con.getOrCreateBrokerService(reqLogger, cr); err != nil {
+func (con *memBrokerController) createBroker(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, *corev1.Service, error) {
+	brokerService, err := createServiceGuard(func() (*corev1.Service, error) {
+		return con.getOrCreateBrokerService(reqLogger, cr)
+	})
+	if err != nil {
 		reqLogger.Error(err, "failed to create broker service", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
-		return nil, err
+		return nil, nil, err
 	}
 
-	brokerStatefulSet, err := con.getOrCreateBrokerStatefulSet(reqLogger, cr)
+	brokerStatefulSet, err := createStatefulSetGuard(func() (*appsv1.StatefulSet, error) {
+		return con.getOrCreateBrokerStatefulSet(reqLogger, cr)
+	})
 	if err != nil {
 		reqLogger.Error(err, "failed to create broker statefulset", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
-		return nil, err
+		return nil, nil, err
 	}
 
-	return brokerStatefulSet, nil
+	return brokerStatefulSet, brokerService, nil
 }
 
 func (con *memBrokerController) getOrCreateBrokerService(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*corev1.Service, error) {
@@ -55,7 +56,11 @@ func (con *memBrokerController) getOrCreateBrokerService(reqLogger logr.Logger, 
 		reqLogger.Info("Creating a new broker service", "Namespace", service.Namespace, "Name", service.Name)
 		err = con.r.client.Create(context.TODO(), service)
 		if err != nil {
-			reqLogger.Error(err, "failed to create broker service")
+			if errors.IsAlreadyExists(err) {
+				reqLogger.Info("broker service already exists")
+			} else {
+				reqLogger.Error(err, "failed to create broker service")
+			}
 			return nil, err
 		}
 
@@ -105,19 +110,52 @@ func (con *memBrokerController) getOrCreateBrokerStatefulSet(reqLogger logr.Logg
 	return found, nil
 }
 
-func (con *memBrokerController) brokerReady(brokerStatefulSet *appsv1.StatefulSet) bool {
-	return brokerStatefulSet.Status.ReadyReplicas >= brokerNum-1
+func (con *memBrokerController) getServiceEndpointsNum(brokerService *corev1.Service) (int, error) {
+	endpoints, err := getEndpoints(con.r.client, brokerService.Name, brokerService.Namespace)
+	if err != nil {
+		return 0, err
+	}
+	return len(endpoints), nil
 }
 
-func (con *memBrokerController) brokerAllReady(brokerStatefulSet *appsv1.StatefulSet) bool {
-	return brokerStatefulSet.Status.ReadyReplicas == brokerNum
+func (con *memBrokerController) brokerReady(brokerStatefulSet *appsv1.StatefulSet, brokerService *corev1.Service) (bool, error) {
+	n, err := con.getServiceEndpointsNum(brokerService)
+	if err != nil {
+		return false, err
+	}
+	ready := brokerStatefulSet.Status.ReadyReplicas >= brokerNum-1 && n >= int(brokerNum-1)
+	return ready, nil
 }
 
-func (con *memBrokerController) reconcileMaster(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, brokerStatefulSet *appsv1.StatefulSet) (string, error) {
-	brokerAddresses := genBrokerStatefulSetAddrs(cr)
+func (con *memBrokerController) brokerAllReady(brokerStatefulSet *appsv1.StatefulSet, brokerService *corev1.Service) (bool, error) {
+	n, err := con.getServiceEndpointsNum(brokerService)
+	if err != nil {
+		return false, err
+	}
+	ready := brokerStatefulSet.Status.ReadyReplicas == brokerNum && n >= int(brokerNum)
+	return ready, err
+}
+
+func (con *memBrokerController) reconcileMaster(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, brokerStatefulSet *appsv1.StatefulSet, brokerService *corev1.Service) (string, error) {
+	endpoints, err := getEndpoints(con.r.client, brokerService.Name, brokerService.Namespace)
+	if err != nil {
+		reqLogger.Error(err, "failed to get broker endpoints", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		return "", err
+	}
+	brokerAddresses := make([]string, 0)
+	for _, endpoint := range endpoints {
+		addr := genBrokerAddressFromName(endpoint.Hostname, cr)
+		brokerAddresses = append(brokerAddresses, addr)
+	}
+
 	currMaster, err := con.getCurrentMaster(reqLogger, brokerAddresses)
+	if err != nil {
+		reqLogger.Error(err, "failed to get current master", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		return "", err
+	}
 	err = con.setMasterBrokerStatus(reqLogger, cr, currMaster)
 	if err != nil {
+		reqLogger.Error(err, "failed to set broker master", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return "", err
 	}
 
@@ -128,7 +166,7 @@ func (con *memBrokerController) setMasterBrokerStatus(reqLogger logr.Logger, cr 
 	cr.Status.MasterBrokerAddress = masterBrokerAddress
 	err := con.r.client.Status().Update(context.TODO(), cr)
 	if err != nil {
-		reqLogger.Error(err, "Failed to set master broker address")
+		reqLogger.Error(err, "Failed to set master broker address", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return err
 	}
 	return nil
@@ -156,9 +194,7 @@ func (con *memBrokerController) getCurrentMaster(reqLogger logr.Logger, brokerAd
 	}
 
 	if len(masterBrokers) == 0 {
-		for _, address := range brokerAddresses {
-			masterBrokers = append(masterBrokers, address)
-		}
+		masterBrokers = append(masterBrokers, brokerAddresses...)
 	}
 
 	var maxEpoch uint64 = 0

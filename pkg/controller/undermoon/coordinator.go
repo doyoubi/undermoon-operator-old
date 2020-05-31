@@ -12,12 +12,13 @@ import (
 const coordinatorPort = 6699
 const coordinatorNum int32 = 3
 const coordinatorContainerName = "coordinator"
+const undermoonServiceTypeCoordinator = "coordinator"
 
 func createCoordinatorService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 	undermoonName := cr.ObjectMeta.Name
 
 	labels := map[string]string{
-		"undermoonService":     "coordinator",
+		"undermoonService":     undermoonServiceTypeCoordinator,
 		"undermoonName":        undermoonName,
 		"undermoonClusterName": cr.Spec.ClusterName,
 	}

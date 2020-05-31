@@ -12,12 +12,13 @@ import (
 const brokerPort = 7799
 const brokerNum int32 = 3
 const brokerContainerName = "broker"
+const undermoonServiceTypeBroker = "broker"
 
 func createBrokerService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 	undermoonName := cr.ObjectMeta.Name
 
 	labels := map[string]string{
-		"undermoonService":     "broker",
+		"undermoonService":     undermoonServiceTypeBroker,
 		"undermoonName":        undermoonName,
 		"undermoonClusterName": cr.Spec.ClusterName,
 	}
@@ -169,4 +170,10 @@ func genBrokerStatefulSetAddrs(cr *undermoonv1alpha1.Undermoon) []string {
 		addrs = append(addrs, addr)
 	}
 	return addrs
+}
+
+func genBrokerAddressFromName(name string, cr *undermoonv1alpha1.Undermoon) string {
+	host := genBrokerFQDN(name, cr.ObjectMeta.Name, cr.ObjectMeta.Namespace)
+	addr := fmt.Sprintf("%s:%d", host, brokerPort)
+	return addr
 }
