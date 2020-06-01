@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/go-logr/logr v0.1.0
+	github.com/go-redis/redis/v8 v8.0.0-beta.2
 	github.com/go-resty/resty/v2 v2.3.0
 	github.com/operator-framework/operator-sdk v0.17.0
 	github.com/pkg/errors v0.9.1

@@ -16,7 +16,7 @@ kind-env:
 list-images:
 	curl http://localhost:5000/v2/_catalog
 
-docker-debug-build:
+debug-build:
 	operator-sdk build localhost:5000/undermoon-operator:v0.0.1
 	docker push localhost:5000/undermoon-operator:v0.0.1
 

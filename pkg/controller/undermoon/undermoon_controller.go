@@ -121,7 +121,15 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
 	}
 
-	_, err = r.brokerCon.reconcileMaster(reqLogger, instance, resource.brokerStatefulSet, resource.brokerService)
+	masterBrokerAddress, err := r.brokerCon.reconcileMaster(reqLogger, instance, resource.brokerService)
+	if err != nil {
+		if err == errRetryReconciliation {
+			return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
+		}
+		return reconcile.Result{}, err
+	}
+
+	err = r.coodinatorCon.configSetBroker(reqLogger, instance, resource.coordinatorService, masterBrokerAddress)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

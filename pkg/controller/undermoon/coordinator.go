@@ -123,3 +123,32 @@ func createCoordinatorStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.State
 func CoordinatorStatefulSetName(undermoonName string) string {
 	return fmt.Sprintf("%s-coordinator-ss", undermoonName)
 }
+
+func genCoordinatorNames(clusterName string) []string {
+	names := []string{}
+	for i := int32(0); i != coordinatorNum; i++ {
+		name := fmt.Sprintf("%s-%d", CoordinatorStatefulSetName(clusterName), i)
+		names = append(names, name)
+	}
+	return names
+}
+
+func genCoordinatorFQDN(coordinatorName, clusterName, namespace string) string {
+	// pod-specific-string.serviceName.default.svc.cluster.local
+	return fmt.Sprintf("%s.%s.%s.svc.cluster.local", coordinatorName, CoordinatorServiceName(clusterName), namespace)
+}
+
+func genCoordinatorStatefulSetAddrs(cr *undermoonv1alpha1.Undermoon) []string {
+	addrs := []string{}
+	for _, name := range genCoordinatorNames(cr.ObjectMeta.Name) {
+		addr := genCoordinatorAddressFromName(name, cr)
+		addrs = append(addrs, addr)
+	}
+	return addrs
+}
+
+func genCoordinatorAddressFromName(name string, cr *undermoonv1alpha1.Undermoon) string {
+	host := genCoordinatorFQDN(name, cr.ObjectMeta.Name, cr.ObjectMeta.Namespace)
+	addr := fmt.Sprintf("%s:%d", host, coordinatorPort)
+	return addr
+}

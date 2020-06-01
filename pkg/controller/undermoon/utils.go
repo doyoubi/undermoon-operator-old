@@ -3,12 +3,16 @@ package undermoon
 import (
 	"context"
 
+	pkgerrors "github.com/pkg/errors"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var errRetryReconciliation = pkgerrors.New("retry reconciliation")
 
 func createServiceGuard(createFunc func() (*corev1.Service, error)) (*corev1.Service, error) {
 	var svc *corev1.Service

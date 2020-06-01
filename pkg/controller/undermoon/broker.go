@@ -165,8 +165,7 @@ func genBrokerFQDN(brokerName, clusterName, namespace string) string {
 func genBrokerStatefulSetAddrs(cr *undermoonv1alpha1.Undermoon) []string {
 	addrs := []string{}
 	for _, name := range genBrokerNames(cr.ObjectMeta.Name) {
-		host := genBrokerFQDN(name, cr.ObjectMeta.Name, cr.ObjectMeta.Namespace)
-		addr := fmt.Sprintf("%s:%d", host, brokerPort)
+		addr := genBrokerAddressFromName(name, cr)
 		addrs = append(addrs, addr)
 	}
 	return addrs

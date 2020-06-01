@@ -14,10 +14,12 @@ import (
 
 type coordinatorController struct {
 	r *ReconcileUndermoon
+	coordPool *coordinatorClientPool
 }
 
 func newCoordinatorController(r *ReconcileUndermoon) *coordinatorController {
-	return &coordinatorController{r: r}
+	coordPool := newCoordinatorClientPool()
+	return &coordinatorController{r: r, coordPool: coordPool}
 }
 
 func (con *coordinatorController) createCoordinator(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, *corev1.Service, error) {
@@ -131,4 +133,23 @@ func (con *coordinatorController) coordiantorAllReady(coordinatorStatefulSet *ap
 	}
 	ready := coordinatorStatefulSet.Status.ReadyReplicas >= coordinatorNum && n >= int(coordinatorNum)
 	return ready, nil
+}
+
+func (con *coordinatorController) configSetBroker(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, coordinatorService *corev1.Service, masterBrokerAddress string) error {
+	endpoints, err := getEndpoints(con.r.client, coordinatorService.Name, coordinatorService.Namespace)
+	if err != nil {
+		reqLogger.Error(err, "failed to get coordinator endpoints", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		return err
+	}
+
+	for _, endpoint := range endpoints {
+		address := genCoordinatorAddressFromName(endpoint.Hostname, cr)
+		err = con.coordPool.setBrokerAddress(address, masterBrokerAddress)
+		if err != nil {
+			reqLogger.Error(err, "failed to set broker to coodinator",
+				"coordinatorAddress", address,
+				"Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		}
+	}
+	return err
 }
