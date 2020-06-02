@@ -78,3 +78,18 @@ func (client *brokerClient) getEpoch(address string) (uint64, error) {
 
 	return epoch, nil
 }
+
+func (client *brokerClient) registerServerProxy(address string, proxy serverProxyMeta) error {
+	url := fmt.Sprintf("http://%s/api/v2/proxies/meta", address)
+	res, err := client.httpClient.R().SetBody(&proxy).Post(url)
+	if err != nil {
+		return err
+	}
+
+	if res.StatusCode() != 200 && res.StatusCode() != 409 {
+		content := res.Body()
+		return errors.Errorf("Failed to register server proxy: invalid status code %d: %s", res.StatusCode(), string(content))
+	}
+
+	return nil
+}

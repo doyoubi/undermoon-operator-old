@@ -5,4 +5,6 @@ metadata:
 spec:
   clusterName: example-cluster
   chunkNumber: 1
+  maxMemory: 32  # in MBs
   undermoonImage: localhost:5000/undermoon_test
+  redisImage: redis:5.0.9

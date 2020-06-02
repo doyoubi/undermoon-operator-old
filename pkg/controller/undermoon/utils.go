@@ -46,6 +46,22 @@ func createStatefulSetGuard(createFunc func() (*appsv1.StatefulSet, error)) (*ap
 	return nil, err
 }
 
+func createDeploymentGuard(createFunc func() (*appsv1.Deployment, error)) (*appsv1.Deployment, error) {
+	var dp *appsv1.Deployment
+	var err error
+	for i := 0; i != 3; i++ {
+		dp, err = createFunc()
+		if err == nil {
+			return dp, err
+		}
+		if errors.IsAlreadyExists(err) {
+			continue
+		}
+		return nil, err
+	}
+	return nil, err
+}
+
 func getEndpoints(client client.Client, serviceName, namespace string) ([]corev1.EndpointAddress, error) {
 	endpoints := &corev1.Endpoints{}
 	// The endpoints names are the same as serviceName
@@ -63,4 +79,17 @@ func getEndpoints(client client.Client, serviceName, namespace string) ([]corev1
 	}
 
 	return addresses, nil
+}
+
+const podIPEnvStr = "$(UM_POD_IP)"
+
+func podIPEnv() corev1.EnvVar {
+	return corev1.EnvVar{
+		Name: "UM_POD_IP",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: "status.podIP",
+			},
+		},
+	}
 }

@@ -50,7 +50,7 @@ func CoordinatorServiceName(clusterName string) string {
 
 func createCoordinatorStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSet {
 	labels := map[string]string{
-		"undermoonService":     "coordinator",
+		"undermoonService":     undermoonServiceTypeCoordinator,
 		"undermoonName":        cr.ObjectMeta.Name,
 		"undermoonClusterName": cr.Spec.ClusterName,
 	}
@@ -62,7 +62,7 @@ func createCoordinatorStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.State
 		},
 		{
 			Name:  "UNDERMOON_ADDRESS",
-			Value: "0.0.0.0:6699",
+			Value: fmt.Sprintf("0.0.0.0:%d", coordinatorPort),
 		},
 		{
 			Name:  "UNDERMOON_BROKER_ADDRESS",
@@ -119,7 +119,7 @@ func createCoordinatorStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.State
 	}
 }
 
-// CoordinatorStatefulSetName defines the statefulset for memory coordinator.
+// CoordinatorStatefulSetName defines the statefulset for coordinator.
 func CoordinatorStatefulSetName(undermoonName string) string {
 	return fmt.Sprintf("%s-coordinator-ss", undermoonName)
 }

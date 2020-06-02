@@ -50,7 +50,7 @@ func BrokerServiceName(clusterName string) string {
 
 func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSet {
 	labels := map[string]string{
-		"undermoonService":     "broker",
+		"undermoonService":     undermoonServiceTypeBroker,
 		"undermoonName":        cr.ObjectMeta.Name,
 		"undermoonClusterName": cr.Spec.ClusterName,
 	}
@@ -62,7 +62,7 @@ func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSe
 		},
 		{
 			Name:  "UNDERMOON_ADDRESS",
-			Value: "0.0.0.0:7799",
+			Value: fmt.Sprintf("0.0.0.0:%d", brokerPort),
 		},
 		{
 			Name:  "UNDERMOON_FAILURE_TTL",

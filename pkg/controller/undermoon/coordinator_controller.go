@@ -13,7 +13,7 @@ import (
 )
 
 type coordinatorController struct {
-	r *ReconcileUndermoon
+	r         *ReconcileUndermoon
 	coordPool *coordinatorClientPool
 }
 

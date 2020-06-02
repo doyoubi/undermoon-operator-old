@@ -40,6 +40,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	}
 	r.brokerCon = newBrokerController(r)
 	r.coodinatorCon = newCoordinatorController(r)
+	r.storageCon = newStorageController(r)
 	return r
 }
 
@@ -81,6 +82,7 @@ type ReconcileUndermoon struct {
 	scheme        *runtime.Scheme
 	brokerCon     *memBrokerController
 	coodinatorCon *coordinatorController
+	storageCon    *storageController
 }
 
 // Reconcile reads that state of the cluster for a Undermoon object and makes changes based on the state read
@@ -134,14 +136,26 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
+	proxies, err := r.storageCon.getServerProxies(reqLogger, resource.storageService, instance)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	err = r.brokerCon.registerServerProxies(reqLogger, masterBrokerAddress, proxies, instance)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	return reconcile.Result{}, nil
 }
 
 type umResource struct {
 	brokerStatefulSet      *appsv1.StatefulSet
 	coordinatorStatefulSet *appsv1.StatefulSet
+	storageDeployment      *appsv1.Deployment
 	brokerService          *corev1.Service
 	coordinatorService     *corev1.Service
+	storageService         *corev1.Service
 }
 
 func (r *ReconcileUndermoon) createResources(reqLogger logr.Logger, instance *undermoonv1alpha1.Undermoon) (*umResource, error) {
@@ -153,15 +167,23 @@ func (r *ReconcileUndermoon) createResources(reqLogger logr.Logger, instance *un
 
 	coordinatorStatefulSet, coordinatorService, err := r.coodinatorCon.createCoordinator(reqLogger, instance)
 	if err != nil {
-		reqLogger.Error(err, "failed to create coordiantor", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		reqLogger.Error(err, "failed to create coordinator", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return nil, err
+	}
+
+	storageDeployment, storageService, err := r.storageCon.createStorage(reqLogger, instance)
+	if err != nil {
+		reqLogger.Error(err, "failed to create storage", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return nil, err
 	}
 
 	return &umResource{
 		brokerStatefulSet:      brokerStatefulSet,
 		coordinatorStatefulSet: coordinatorStatefulSet,
+		storageDeployment:      storageDeployment,
 		brokerService:          brokerService,
 		coordinatorService:     coordinatorService,
+		storageService:         storageService,
 	}, nil
 }
 
@@ -183,6 +205,16 @@ func (r *ReconcileUndermoon) resourceReady(resource *umResource, reqLogger logr.
 	}
 	if !ready {
 		reqLogger.Info("coordinator statefulset not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return false, nil
+	}
+
+	ready, err = r.storageCon.storageReady(resource.storageDeployment, resource.storageService, instance)
+	if err != nil {
+		reqLogger.Error(err, "failed to check storage ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		return false, err
+	}
+	if !ready {
+		reqLogger.Info("storage deployment not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return false, nil
 	}
 	return true, nil

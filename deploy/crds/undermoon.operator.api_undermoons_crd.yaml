@@ -41,11 +41,22 @@ spec:
               maxLength: 30
               minLength: 1
               type: string
+            maxMemory:
+              description: max_memory for each Redis instance in MBs.
+              format: int32
+              minimum: 1
+              type: integer
+            redisImage:
+              minLength: 1
+              type: string
             undermoonImage:
+              minLength: 1
               type: string
           required:
           - chunkNumber
           - clusterName
+          - maxMemory
+          - redisImage
           - undermoonImage
           type: object
         status:

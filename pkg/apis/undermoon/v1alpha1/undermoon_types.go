@@ -18,8 +18,14 @@ type UndermoonSpec struct {
 	ClusterName string `json:"clusterName"`
 	// Each chunk has 2 masters and 2 replicas. This field is used to specify node number of the cluster.
 	// +kubebuilder:validation:Minimum=1
-	ChunkNumber    uint32 `json:"chunkNumber"`
+	ChunkNumber uint32 `json:"chunkNumber"`
+	// max_memory for each Redis instance in MBs.
+	// +kubebuilder:validation:Minimum=1
+	MaxMemory uint32 `json:"maxMemory"`
+	// +kubebuilder:validation:MinLength=1
 	UndermoonImage string `json:"undermoonImage"`
+	// +kubebuilder:validation:MinLength=1
+	RedisImage string `json:"redisImage"`
 }
 
 // UndermoonStatus defines the observed state of Undermoon

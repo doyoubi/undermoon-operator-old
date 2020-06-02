@@ -169,7 +169,7 @@ func (con *memBrokerController) setMasterBrokerStatus(reqLogger logr.Logger, cr 
 			reqLogger.Info("Conflict on master broker status. Try again.", "error", err)
 			return errRetryReconciliation
 		}
-		reqLogger.Error(err, "Failed to set master broker address", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		reqLogger.Error(err, "Failed to set master broker address", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return err
 	}
 	return nil
@@ -215,4 +215,14 @@ func (con *memBrokerController) getCurrentMaster(reqLogger logr.Logger, brokerAd
 	}
 
 	return maxEpochBroker, nil
+}
+
+func (con *memBrokerController) registerServerProxies(reqLogger logr.Logger, masterBrokerAddress string, proxies []serverProxyMeta, cr *undermoonv1alpha1.Undermoon) error {
+	for _, proxy := range proxies {
+		err := con.client.registerServerProxy(masterBrokerAddress, proxy)
+		if err != nil {
+			reqLogger.Error(err, "failed to register server proxy", "proxy", proxy, "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		}
+	}
+	return nil
 }
