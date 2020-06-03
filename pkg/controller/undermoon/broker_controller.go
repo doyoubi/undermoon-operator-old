@@ -216,13 +216,3 @@ func (con *memBrokerController) getCurrentMaster(reqLogger logr.Logger, brokerAd
 
 	return maxEpochBroker, nil
 }
-
-func (con *memBrokerController) registerServerProxies(reqLogger logr.Logger, masterBrokerAddress string, proxies []serverProxyMeta, cr *undermoonv1alpha1.Undermoon) error {
-	for _, proxy := range proxies {
-		err := con.client.registerServerProxy(masterBrokerAddress, proxy)
-		if err != nil {
-			reqLogger.Error(err, "failed to register server proxy", "proxy", proxy, "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
-		}
-	}
-	return nil
-}

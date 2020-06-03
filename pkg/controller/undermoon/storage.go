@@ -16,23 +16,6 @@ const serverProxyContainerName = "server-proxy"
 const redisContainerName = "redis"
 const undermoonServiceTypeStorage = "storage"
 
-type serverProxyMeta struct {
-	ProxyAddress   string    `json:"proxy_address"`
-	RedisAddresses [2]string `json:"nodes"`
-	Host           string    `host`
-}
-
-func newServerProxyMeta(ip, nodeIP string) serverProxyMeta {
-	return serverProxyMeta{
-		ProxyAddress: fmt.Sprintf("%s:%d", ip, serverProxyPort),
-		RedisAddresses: [2]string{
-			fmt.Sprintf("%s:%d", ip, redisPort1),
-			fmt.Sprintf("%s:%d", ip, redisPort2),
-		},
-		Host: nodeIP,
-	}
-}
-
 func createStorageService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 	undermoonName := cr.ObjectMeta.Name
 

@@ -41,6 +41,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r.brokerCon = newBrokerController(r)
 	r.coodinatorCon = newCoordinatorController(r)
 	r.storageCon = newStorageController(r)
+	r.metaCon = newMetaController()
 	return r
 }
 
@@ -83,6 +84,7 @@ type ReconcileUndermoon struct {
 	brokerCon     *memBrokerController
 	coodinatorCon *coordinatorController
 	storageCon    *storageController
+	metaCon       *metaController
 }
 
 // Reconcile reads that state of the cluster for a Undermoon object and makes changes based on the state read
@@ -136,12 +138,12 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	proxies, err := r.storageCon.getServerProxies(reqLogger, resource.storageService, instance)
+	proxyIPs, err := r.storageCon.getServerProxiesIPs(reqLogger, resource.storageService, instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	err = r.brokerCon.registerServerProxies(reqLogger, masterBrokerAddress, proxies, instance)
+	err = r.metaCon.reconcileMeta(reqLogger, masterBrokerAddress, proxyIPs, instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

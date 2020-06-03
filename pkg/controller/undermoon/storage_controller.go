@@ -135,19 +135,17 @@ func (con *storageController) storageAllReady(storageDeployment *appsv1.Deployme
 	return ready, err
 }
 
-func (con *storageController) getServerProxies(reqLogger logr.Logger, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) ([]serverProxyMeta, error) {
+func (con *storageController) getServerProxiesIPs(reqLogger logr.Logger, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) ([]string, error) {
 	endpoints, err := getEndpoints(con.r.client, storageService.Name, storageService.Namespace)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get endpoints of server proxies", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return nil, err
 	}
 
-	proxies := []serverProxyMeta{}
+	ips := []string{}
 	for _, endpoint := range endpoints {
-		ip := endpoint.IP
-		proxy := newServerProxyMeta(ip, ip)
-		proxies = append(proxies, proxy)
+		ips = append(ips, endpoint.IP)
 	}
 
-	return proxies, nil
+	return ips, nil
 }
