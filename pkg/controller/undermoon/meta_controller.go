@@ -25,8 +25,17 @@ func (con *metaController) reconcileMeta(reqLogger logr.Logger, masterBrokerAddr
 		return err
 	}
 
-	err = con.changeNodeNumber(reqLogger, masterBrokerAddress, cr)
+	return nil
+}
+
+func (con *metaController) changeMeta(reqLogger logr.Logger, masterBrokerAddress string, cr *undermoonv1alpha1.Undermoon) error {
+	// TODO: wait for running migration
+
+	err := con.changeNodeNumber(reqLogger, masterBrokerAddress, cr)
 	if err != nil {
+		if err == errMigrationRunning {
+			return errRetryReconciliation
+		}
 		return err
 	}
 
@@ -125,33 +134,41 @@ func (con *metaController) changeNodeNumber(reqLogger logr.Logger, masterBrokerA
 
 	err := con.client.addNodes(masterBrokerAddress, clusterName, chunkNumber)
 	if err != nil {
-		reqLogger.Error(err, "failed to add nodes",
-			"Name", cr.ObjectMeta.Name,
-			"ClusterName", cr.Spec.ClusterName)
+		if err != errMigrationRunning {
+			reqLogger.Error(err, "failed to add nodes",
+				"Name", cr.ObjectMeta.Name,
+				"ClusterName", cr.Spec.ClusterName)
+		}
 		return err
 	}
 
 	err = con.client.expandSlots(masterBrokerAddress, clusterName)
 	if err != nil {
-		reqLogger.Error(err, "failed to expand slots",
-			"Name", cr.ObjectMeta.Name,
-			"ClusterName", cr.Spec.ClusterName)
+		if err != errMigrationRunning {
+			reqLogger.Error(err, "failed to expand slots",
+				"Name", cr.ObjectMeta.Name,
+				"ClusterName", cr.Spec.ClusterName)
+		}
 		return err
 	}
 
 	err = con.client.shrinkSlots(masterBrokerAddress, clusterName, chunkNumber)
 	if err != nil {
-		reqLogger.Error(err, "failed to shrink slots",
-			"Name", cr.ObjectMeta.Name,
-			"ClusterName", cr.Spec.ClusterName)
+		if err != errMigrationRunning {
+			reqLogger.Error(err, "failed to shrink slots",
+				"Name", cr.ObjectMeta.Name,
+				"ClusterName", cr.Spec.ClusterName)
+		}
 		return err
 	}
 
 	err = con.client.removeFreeNodes(masterBrokerAddress, clusterName)
 	if err != nil {
-		reqLogger.Error(err, "failed to remove free nodes",
-			"Name", cr.ObjectMeta.Name,
-			"ClusterName", cr.Spec.ClusterName)
+		if err != errMigrationRunning {
+			reqLogger.Error(err, "failed to remove free nodes",
+				"Name", cr.ObjectMeta.Name,
+				"ClusterName", cr.Spec.ClusterName)
+		}
 		return err
 	}
 

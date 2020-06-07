@@ -148,6 +148,19 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
+	resource.storageDeployment, err = r.storageCon.updateStorageDeployment(reqLogger, instance, resource.storageDeployment)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	err = r.metaCon.changeMeta(reqLogger, masterBrokerAddress, instance)
+	if err != nil {
+		if err == errRetryReconciliation {
+			return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
+		}
+		return reconcile.Result{}, err
+	}
+
 	return reconcile.Result{}, nil
 }
 

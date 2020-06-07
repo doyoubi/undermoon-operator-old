@@ -42,6 +42,9 @@ debug-stop:
 	kubectl delete -f deploy/role.yaml || true
 	kubectl delete -f deploy/service_account.yaml || true
 
+debug-edit:
+	kubectl edit undermoon/example-undermoon
+
 run-busybox:
 	kubectl run -i --tty --rm debug --image=busybox --restart=Never -- sh
 

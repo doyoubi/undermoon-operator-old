@@ -37,6 +37,19 @@ func (con *storageController) createStorage(reqLogger logr.Logger, cr *undermoon
 		return nil, nil, err
 	}
 
+	// Only update replica number here for scaling out.
+	if int32(cr.Spec.ChunkNumber)*2 > *storageDeployment.Spec.Replicas {
+		storageDeployment, err = con.updateStorageDeployment(reqLogger, cr, storageDeployment)
+		if err != nil {
+			if errors.IsConflict(err) {
+				reqLogger.Info("Conflict on updating storage deployment. Try again.", "error", err)
+				return nil, nil, errRetryReconciliation
+			}
+			reqLogger.Error(err, "failed to update storage deployment", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+			return nil, nil, err
+		}
+	}
+
 	return storageDeployment, storageService, nil
 }
 
@@ -98,13 +111,26 @@ func (con *storageController) getOrCreateStorageDeployment(reqLogger logr.Logger
 		// deployment created successfully - don't requeue
 		return storage, nil
 	} else if err != nil {
-		reqLogger.Error(err, "failed to get storage deployment")
+		reqLogger.Error(err, "failed to get storage deployment", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return nil, err
 	}
 
 	// storage already exists - don't requeue
 	reqLogger.Info("Skip reconcile: storage deployment already exists", "Namespace", found.Namespace, "Name", found.Name)
 	return found, nil
+}
+
+func (con *storageController) updateStorageDeployment(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, storage *appsv1.Deployment) (*appsv1.Deployment, error) {
+	replicaNum := int32(cr.Spec.ChunkNumber) * 2
+	storage.Spec.Replicas = &replicaNum
+
+	err := con.r.client.Update(context.TODO(), storage)
+	if err != nil {
+		reqLogger.Error(err, "failed to update storage deployment", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		return nil, err
+	}
+
+	return storage, nil
 }
 
 func (con *storageController) getServiceEndpointsNum(storageService *corev1.Service) (int, error) {
