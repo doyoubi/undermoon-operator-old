@@ -174,7 +174,7 @@ func (client *brokerClient) createCluster(address, clusterName string, chunkNumb
 	payload := &createClusterPayload{
 		NodeNumber: chunkNumber * 4,
 	}
-	res, err := client.httpClient.R().SetBody(payload).SetResult(&errorResponse{}).Post(url)
+	res, err := client.httpClient.R().SetBody(payload).SetError(&errorResponse{}).Post(url)
 	if err != nil {
 		return err
 	}
@@ -184,7 +184,7 @@ func (client *brokerClient) createCluster(address, clusterName string, chunkNumb
 	}
 
 	if res.StatusCode() == 409 {
-		response, ok := res.Result().(*errorResponse)
+		response, ok := res.Error().(*errorResponse)
 		if ok && response.Error == errStrAlreadyExists {
 			return nil
 		}
@@ -233,7 +233,7 @@ func (client *brokerClient) addNodes(address, clusterName string, chunkNumber in
 	payload := &addNodesPayload{
 		ClusterNodeNumber: chunkNumber * 4,
 	}
-	res, err := client.httpClient.R().SetBody(payload).SetResult(&errorResponse{}).Put(url)
+	res, err := client.httpClient.R().SetBody(payload).SetError(&errorResponse{}).Put(url)
 	if err != nil {
 		return err
 	}
@@ -243,7 +243,7 @@ func (client *brokerClient) addNodes(address, clusterName string, chunkNumber in
 	}
 
 	if res.StatusCode() == 409 {
-		response, ok := res.Result().(*errorResponse)
+		response, ok := res.Error().(*errorResponse)
 		if ok && response.Error == errStrNodeNumAlreadyEnough {
 			return nil
 		}
@@ -256,12 +256,9 @@ func (client *brokerClient) addNodes(address, clusterName string, chunkNumber in
 	return errors.Errorf("Failed to add nodes to cluster: invalid status code %d: %s", res.StatusCode(), string(content))
 }
 
-func (client *brokerClient) removeFreeNodes(address, clusterName string, chunkNumber int) error {
+func (client *brokerClient) removeFreeNodes(address, clusterName string) error {
 	url := fmt.Sprintf("http://%s/api/v2/clusters/free_nodes/%s", address, clusterName)
-	payload := &addNodesPayload{
-		ClusterNodeNumber: chunkNumber * 4,
-	}
-	res, err := client.httpClient.R().SetBody(payload).SetResult(&errorResponse{}).Delete(url)
+	res, err := client.httpClient.R().SetError(&errorResponse{}).Delete(url)
 	if err != nil {
 		return err
 	}
@@ -270,8 +267,8 @@ func (client *brokerClient) removeFreeNodes(address, clusterName string, chunkNu
 		return nil
 	}
 
-	if res.StatusCode() == 409 {
-		response, ok := res.Result().(*errorResponse)
+	if res.StatusCode() == 409 || res.StatusCode() == 404 {
+		response, ok := res.Error().(*errorResponse)
 		if ok && response.Error == errStrFreeNodeNotFound {
 			return nil
 		}
@@ -286,7 +283,7 @@ func (client *brokerClient) removeFreeNodes(address, clusterName string, chunkNu
 
 func (client *brokerClient) expandSlots(address, clusterName string) error {
 	url := fmt.Sprintf("http://%s/api/v2/clusters/migrations/expand/%s", address, clusterName)
-	res, err := client.httpClient.R().SetResult(&errorResponse{}).Post(url)
+	res, err := client.httpClient.R().SetError(&errorResponse{}).Post(url)
 	if err != nil {
 		return err
 	}
@@ -295,8 +292,11 @@ func (client *brokerClient) expandSlots(address, clusterName string) error {
 		return nil
 	}
 
-	if res.StatusCode() == 409 {
-		response, ok := res.Result().(*errorResponse)
+	if res.StatusCode() == 409 || res.StatusCode() == 400 {
+		response, ok := res.Error().(*errorResponse)
+		if ok && response.Error == errSlotsAlreadyEven {
+			return nil
+		}
 		if ok && response.Error == errStrFreeNodeNotFound {
 			return nil
 		}
@@ -311,8 +311,8 @@ func (client *brokerClient) expandSlots(address, clusterName string) error {
 }
 
 func (client *brokerClient) shrinkSlots(address, clusterName string, chunkNumber int) error {
-	url := fmt.Sprintf("http://%s/api/v2/clusters/migrations/shrink/%s/", address, clusterName, chunkNumber*4)
-	res, err := client.httpClient.R().SetResult(&errorResponse{}).Post(url)
+	url := fmt.Sprintf("http://%s/api/v2/clusters/migrations/shrink/%s/%d", address, clusterName, chunkNumber*4)
+	res, err := client.httpClient.R().SetError(&errorResponse{}).Post(url)
 	if err != nil {
 		return err
 	}
@@ -321,8 +321,8 @@ func (client *brokerClient) shrinkSlots(address, clusterName string, chunkNumber
 		return nil
 	}
 
-	if res.StatusCode() == 409 {
-		response, ok := res.Result().(*errorResponse)
+	if res.StatusCode() == 409 || res.StatusCode() == 400 {
+		response, ok := res.Error().(*errorResponse)
 		if ok && response.Error == errStrInvalidNodeNumber {
 			// This should only happen when chunkNumber is equal to the current number.
 			return nil
@@ -336,5 +336,5 @@ func (client *brokerClient) shrinkSlots(address, clusterName string, chunkNumber
 	}
 
 	content := res.Body()
-	return errors.Errorf("Failed to start migration: invalid status code %d: %s", res.StatusCode(), string(content))
+	return errors.Errorf("Failed to shrink slots: invalid status code %d: %s", res.StatusCode(), string(content))
 }

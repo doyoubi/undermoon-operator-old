@@ -25,6 +25,11 @@ func (con *metaController) reconcileMeta(reqLogger logr.Logger, masterBrokerAddr
 		return err
 	}
 
+	err = con.changeNodeNumber(reqLogger, masterBrokerAddress, cr)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -111,5 +116,44 @@ func (con *metaController) createCluster(reqLogger logr.Logger, masterBrokerAddr
 			"ClusterName", cr.Spec.ClusterName)
 		return err
 	}
+	return nil
+}
+
+func (con *metaController) changeNodeNumber(reqLogger logr.Logger, masterBrokerAddress string, cr *undermoonv1alpha1.Undermoon) error {
+	chunkNumber := int(cr.Spec.ChunkNumber)
+	clusterName := cr.Spec.ClusterName
+
+	err := con.client.addNodes(masterBrokerAddress, clusterName, chunkNumber)
+	if err != nil {
+		reqLogger.Error(err, "failed to add nodes",
+			"Name", cr.ObjectMeta.Name,
+			"ClusterName", cr.Spec.ClusterName)
+		return err
+	}
+
+	err = con.client.expandSlots(masterBrokerAddress, clusterName)
+	if err != nil {
+		reqLogger.Error(err, "failed to expand slots",
+			"Name", cr.ObjectMeta.Name,
+			"ClusterName", cr.Spec.ClusterName)
+		return err
+	}
+
+	err = con.client.shrinkSlots(masterBrokerAddress, clusterName, chunkNumber)
+	if err != nil {
+		reqLogger.Error(err, "failed to shrink slots",
+			"Name", cr.ObjectMeta.Name,
+			"ClusterName", cr.Spec.ClusterName)
+		return err
+	}
+
+	err = con.client.removeFreeNodes(masterBrokerAddress, clusterName)
+	if err != nil {
+		reqLogger.Error(err, "failed to remove free nodes",
+			"Name", cr.ObjectMeta.Name,
+			"ClusterName", cr.Spec.ClusterName)
+		return err
+	}
+
 	return nil
 }
