@@ -172,7 +172,7 @@ type createClusterPayload struct {
 func (client *brokerClient) createCluster(address, clusterName string, chunkNumber int) error {
 	url := fmt.Sprintf("http://%s/api/v2/clusters/meta/%s", address, clusterName)
 	payload := &createClusterPayload{
-		NodeNumber: chunkNumber * 4,
+		NodeNumber: chunkNumber * chunkNodeNumber,
 	}
 	res, err := client.httpClient.R().SetBody(payload).SetError(&errorResponse{}).Post(url)
 	if err != nil {
@@ -228,61 +228,9 @@ type addNodesPayload struct {
 	ClusterNodeNumber int `json:"cluster_node_number"`
 }
 
-func (client *brokerClient) addNodes(address, clusterName string, chunkNumber int) error {
-	url := fmt.Sprintf("http://%s/api/v2/clusters/nodes/%s", address, clusterName)
-	payload := &addNodesPayload{
-		ClusterNodeNumber: chunkNumber * 4,
-	}
-	res, err := client.httpClient.R().SetBody(payload).SetError(&errorResponse{}).Put(url)
-	if err != nil {
-		return err
-	}
-
-	if res.StatusCode() == 200 {
-		return nil
-	}
-
-	if res.StatusCode() == 409 {
-		response, ok := res.Error().(*errorResponse)
-		if ok && response.Error == errStrNodeNumAlreadyEnough {
-			return nil
-		}
-		if ok && response.Error == errStrMigrationRunning {
-			return errMigrationRunning
-		}
-	}
-
-	content := res.Body()
-	return errors.Errorf("Failed to add nodes to cluster: invalid status code %d: %s", res.StatusCode(), string(content))
-}
-
-func (client *brokerClient) removeFreeNodes(address, clusterName string) error {
-	url := fmt.Sprintf("http://%s/api/v2/clusters/free_nodes/%s", address, clusterName)
-	res, err := client.httpClient.R().SetError(&errorResponse{}).Delete(url)
-	if err != nil {
-		return err
-	}
-
-	if res.StatusCode() == 200 {
-		return nil
-	}
-
-	if res.StatusCode() == 409 || res.StatusCode() == 404 {
-		response, ok := res.Error().(*errorResponse)
-		if ok && response.Error == errStrFreeNodeNotFound {
-			return nil
-		}
-		if ok && response.Error == errStrMigrationRunning {
-			return errMigrationRunning
-		}
-	}
-
-	content := res.Body()
-	return errors.Errorf("Failed to remove free nodes to cluster: invalid status code %d: %s", res.StatusCode(), string(content))
-}
-
-func (client *brokerClient) expandSlots(address, clusterName string) error {
-	url := fmt.Sprintf("http://%s/api/v2/clusters/migrations/expand/%s", address, clusterName)
+func (client *brokerClient) scaleNodes(address, clusterName string, chunkNumber int) error {
+	nodeNumber := chunkNumber * chunkNodeNumber
+	url := fmt.Sprintf("http://%s/api/v2/clusters/migrations/auto/%s/%d", address, clusterName, nodeNumber)
 	res, err := client.httpClient.R().SetError(&errorResponse{}).Post(url)
 	if err != nil {
 		return err
@@ -294,12 +242,6 @@ func (client *brokerClient) expandSlots(address, clusterName string) error {
 
 	if res.StatusCode() == 409 || res.StatusCode() == 400 {
 		response, ok := res.Error().(*errorResponse)
-		if ok && response.Error == errSlotsAlreadyEven {
-			return nil
-		}
-		if ok && response.Error == errStrFreeNodeNotFound {
-			return nil
-		}
 		if ok && response.Error == errStrMigrationRunning {
 			return errMigrationRunning
 		}
@@ -307,34 +249,4 @@ func (client *brokerClient) expandSlots(address, clusterName string) error {
 
 	content := res.Body()
 	return errors.Errorf("Failed to expand slots: invalid status code %d: %s", res.StatusCode(), string(content))
-
-}
-
-func (client *brokerClient) shrinkSlots(address, clusterName string, chunkNumber int) error {
-	url := fmt.Sprintf("http://%s/api/v2/clusters/migrations/shrink/%s/%d", address, clusterName, chunkNumber*4)
-	res, err := client.httpClient.R().SetError(&errorResponse{}).Post(url)
-	if err != nil {
-		return err
-	}
-
-	if res.StatusCode() == 200 {
-		return nil
-	}
-
-	if res.StatusCode() == 409 || res.StatusCode() == 400 {
-		response, ok := res.Error().(*errorResponse)
-		if ok && response.Error == errStrInvalidNodeNumber {
-			// This should only happen when chunkNumber is equal to the current number.
-			return nil
-		}
-		if ok && response.Error == errStrFreeNodeFound {
-			return nil
-		}
-		if ok && response.Error == errStrMigrationRunning {
-			return errMigrationRunning
-		}
-	}
-
-	content := res.Body()
-	return errors.Errorf("Failed to shrink slots: invalid status code %d: %s", res.StatusCode(), string(content))
 }

@@ -12,6 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const chunkNodeNumber int = 4
+
 var errRetryReconciliation = pkgerrors.New("retry reconciliation")
 
 func createServiceGuard(createFunc func() (*corev1.Service, error)) (*corev1.Service, error) {

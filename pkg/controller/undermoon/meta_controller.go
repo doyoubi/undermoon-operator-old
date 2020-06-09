@@ -132,40 +132,10 @@ func (con *metaController) changeNodeNumber(reqLogger logr.Logger, masterBrokerA
 	chunkNumber := int(cr.Spec.ChunkNumber)
 	clusterName := cr.Spec.ClusterName
 
-	err := con.client.addNodes(masterBrokerAddress, clusterName, chunkNumber)
+	err := con.client.scaleNodes(masterBrokerAddress, clusterName, chunkNumber)
 	if err != nil {
 		if err != errMigrationRunning {
-			reqLogger.Error(err, "failed to add nodes",
-				"Name", cr.ObjectMeta.Name,
-				"ClusterName", cr.Spec.ClusterName)
-		}
-		return err
-	}
-
-	err = con.client.expandSlots(masterBrokerAddress, clusterName)
-	if err != nil {
-		if err != errMigrationRunning {
-			reqLogger.Error(err, "failed to expand slots",
-				"Name", cr.ObjectMeta.Name,
-				"ClusterName", cr.Spec.ClusterName)
-		}
-		return err
-	}
-
-	err = con.client.shrinkSlots(masterBrokerAddress, clusterName, chunkNumber)
-	if err != nil {
-		if err != errMigrationRunning {
-			reqLogger.Error(err, "failed to shrink slots",
-				"Name", cr.ObjectMeta.Name,
-				"ClusterName", cr.Spec.ClusterName)
-		}
-		return err
-	}
-
-	err = con.client.removeFreeNodes(masterBrokerAddress, clusterName)
-	if err != nil {
-		if err != errMigrationRunning {
-			reqLogger.Error(err, "failed to remove free nodes",
+			reqLogger.Error(err, "failed to scale nodes",
 				"Name", cr.ObjectMeta.Name,
 				"ClusterName", cr.Spec.ClusterName)
 		}
