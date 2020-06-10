@@ -9,12 +9,7 @@ import (
 )
 
 const errStrAlreadyExists = "ALREADY_EXISTED"
-const errStrNodeNumAlreadyEnough = "NODE_NUM_ALREADY_ENOUGH"
 const errStrMigrationRunning = "MIGRATION_RUNNING"
-const errStrFreeNodeNotFound = "FREE_NODE_NOT_FOUND"
-const errStrFreeNodeFound = "FREE_NODE_FOUND"
-const errStrInvalidNodeNumber = "INVALID_NODE_NUMBER"
-const errSlotsAlreadyEven = "SLOTS_ALREADY_EVEN"
 
 var errMigrationRunning = errors.New("MIGRATION_RUNNING")
 
@@ -224,10 +219,6 @@ func (client *brokerClient) clusterExists(address, clusterName string) (bool, er
 	return false, nil
 }
 
-type addNodesPayload struct {
-	ClusterNodeNumber int `json:"cluster_node_number"`
-}
-
 func (client *brokerClient) scaleNodes(address, clusterName string, chunkNumber int) error {
 	nodeNumber := chunkNumber * chunkNodeNumber
 	url := fmt.Sprintf("http://%s/api/v2/clusters/migrations/auto/%s/%d", address, clusterName, nodeNumber)
@@ -249,4 +240,38 @@ func (client *brokerClient) scaleNodes(address, clusterName string, chunkNumber 
 
 	content := res.Body()
 	return errors.Errorf("Failed to expand slots: invalid status code %d: %s", res.StatusCode(), string(content))
+}
+
+type clusterInfo struct {
+	Name                string `json:"name"`
+	NodeNumber          int    `json:"node_number"`
+	NodeNumberWithSlots int    `json:"node_number_with_slots"`
+	IsMigrating         bool   `json:"is_migrating"`
+}
+
+func (client *brokerClient) getClusterInfo(address, clusterName string) (*clusterInfo, error) {
+	url := fmt.Sprintf("http://%s/api/v2/clusters/info/%s", address, clusterName)
+	res, err := client.httpClient.R().SetResult(&clusterInfo{}).SetError(&errorResponse{}).Post(url)
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode() == 200 {
+		info, ok := res.Result().(*clusterInfo)
+		if !ok {
+			return nil, errors.Errorf("failed to get cluster info, invalid content %s", res.Body())
+		}
+		return info, nil
+	}
+
+	if res.StatusCode() == 404 {
+		response, ok := res.Error().(*errorResponse)
+		if ok {
+			return nil, errors.Errorf("failed to get cluster info, error code %s", response.Error)
+		}
+	}
+
+	content := res.Body()
+	return nil, errors.Errorf("Failed to get cluster info: invalid status code %d: %s", res.StatusCode(), string(content))
+
 }

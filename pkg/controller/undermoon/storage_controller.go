@@ -120,6 +120,30 @@ func (con *storageController) getOrCreateStorageDeployment(reqLogger logr.Logger
 	return found, nil
 }
 
+func (con *storageController) scaleDown(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, storage *appsv1.Deployment, info *clusterInfo) (*appsv1.Deployment, error) {
+	expectedNodeNumber := int(cr.Spec.ChunkNumber) * chunkNodeNumber
+	if info.NodeNumberWithSlots > expectedNodeNumber {
+		reqLogger.Info("Need to wait for slot migration to scale down storage", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		return storage, errRetryReconciliation
+	}
+
+	if info.NodeNumberWithSlots < expectedNodeNumber {
+		reqLogger.Info("Need to scale up", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		return storage, errRetryReconciliation
+	}
+
+	storage, err := con.updateStorageDeployment(reqLogger, cr, storage)
+	if err != nil {
+		if errors.IsConflict(err) {
+			reqLogger.Info("Conflict on updating storage deployment. Try again.", "error", err)
+			return nil, errRetryReconciliation
+		}
+		reqLogger.Error(err, "failed to update storage deployment", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		return nil, err
+	}
+	return storage, nil
+}
+
 func (con *storageController) updateStorageDeployment(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, storage *appsv1.Deployment) (*appsv1.Deployment, error) {
 	replicaNum := int32(cr.Spec.ChunkNumber) * 2
 	storage.Spec.Replicas = &replicaNum
