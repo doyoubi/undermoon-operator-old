@@ -2,6 +2,8 @@ package undermoon
 
 import (
 	"context"
+	"strings"
+	"strconv"
 
 	undermoonv1alpha1 "github.com/doyoubi/undermoon-operator/pkg/apis/undermoon/v1alpha1"
 	"github.com/go-logr/logr"
@@ -20,7 +22,7 @@ func newStorageController(r *ReconcileUndermoon) *storageController {
 	return &storageController{r: r}
 }
 
-func (con *storageController) createStorage(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.Deployment, *corev1.Service, error) {
+func (con *storageController) createStorage(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, *corev1.Service, error) {
 	storageService, err := createServiceGuard(func() (*corev1.Service, error) {
 		return con.getOrCreateStorageService(reqLogger, cr)
 	})
@@ -29,28 +31,26 @@ func (con *storageController) createStorage(reqLogger logr.Logger, cr *undermoon
 		return nil, nil, err
 	}
 
-	storageDeployment, err := createDeploymentGuard(func() (*appsv1.Deployment, error) {
-		return con.getOrCreateStorageDeployment(reqLogger, cr)
+	storage, err := createStatefulSetGuard(func() (*appsv1.StatefulSet, error) {
+		return con.getOrCreateStorageStatefulSet(reqLogger, cr)
 	})
 	if err != nil {
-		reqLogger.Error(err, "failed to create storage deployment", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		reqLogger.Error(err, "failed to create storage StatefulSet", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return nil, nil, err
 	}
 
 	// Only update replica number here for scaling out.
-	if int32(cr.Spec.ChunkNumber)*2 > *storageDeployment.Spec.Replicas {
-		storageDeployment, err = con.updateStorageDeployment(reqLogger, cr, storageDeployment)
+	if int32(cr.Spec.ChunkNumber)*2 > *storage.Spec.Replicas {
+		storage, err = con.updateStorageStatefulSet(reqLogger, cr, storage)
 		if err != nil {
-			if errors.IsConflict(err) {
-				reqLogger.Info("Conflict on updating storage deployment. Try again.", "error", err)
-				return nil, nil, errRetryReconciliation
+			if err != errRetryReconciliation {
+				reqLogger.Error(err, "failed to update storage StatefulSet", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 			}
-			reqLogger.Error(err, "failed to update storage deployment", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 			return nil, nil, err
 		}
 	}
 
-	return storageDeployment, storageService, nil
+	return storage, storageService, nil
 }
 
 func (con *storageController) getOrCreateStorageService(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*corev1.Service, error) {
@@ -85,42 +85,42 @@ func (con *storageController) getOrCreateStorageService(reqLogger logr.Logger, c
 	return found, nil
 }
 
-func (con *storageController) getOrCreateStorageDeployment(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.Deployment, error) {
-	storage := createStorageDeployment(cr)
+func (con *storageController) getOrCreateStorageStatefulSet(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, error) {
+	storage := createStorageStatefulSet(cr)
 
 	if err := controllerutil.SetControllerReference(cr, storage, con.r.scheme); err != nil {
 		reqLogger.Error(err, "SetControllerReference failed")
 		return nil, err
 	}
 
-	// Check if this storage deployment already exists
-	found := &appsv1.Deployment{}
+	// Check if this storage StatefulSet already exists
+	found := &appsv1.StatefulSet{}
 	err := con.r.client.Get(context.TODO(), types.NamespacedName{Name: storage.Name, Namespace: storage.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new storage deployment", "Namespace", storage.Namespace, "Name", storage.Name)
+		reqLogger.Info("Creating a new storage StatefulSet", "Namespace", storage.Namespace, "Name", storage.Name)
 		err = con.r.client.Create(context.TODO(), storage)
 		if err != nil {
 			if errors.IsAlreadyExists(err) {
-				reqLogger.Info("storage deployment already exists")
+				reqLogger.Info("storage StatefulSet already exists")
 			} else {
-				reqLogger.Error(err, "failed to create storage deployment")
+				reqLogger.Error(err, "failed to create storage StatefulSet")
 			}
 			return nil, err
 		}
 
-		// deployment created successfully - don't requeue
+		// StatefulSet created successfully - don't requeue
 		return storage, nil
 	} else if err != nil {
-		reqLogger.Error(err, "failed to get storage deployment", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		reqLogger.Error(err, "failed to get storage StatefulSet", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return nil, err
 	}
 
 	// storage already exists - don't requeue
-	reqLogger.Info("Skip reconcile: storage deployment already exists", "Namespace", found.Namespace, "Name", found.Name)
+	reqLogger.Info("Skip reconcile: storage StatefulSet already exists", "Namespace", found.Namespace, "Name", found.Name)
 	return found, nil
 }
 
-func (con *storageController) scaleDown(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, storage *appsv1.Deployment, info *clusterInfo) (*appsv1.Deployment, error) {
+func (con *storageController) scaleDown(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, storage *appsv1.StatefulSet, info *clusterInfo) (*appsv1.StatefulSet, error) {
 	expectedNodeNumber := int(cr.Spec.ChunkNumber) * chunkNodeNumber
 	if info.NodeNumberWithSlots > expectedNodeNumber {
 		reqLogger.Info("Need to wait for slot migration to scale down storage", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
@@ -132,25 +132,24 @@ func (con *storageController) scaleDown(reqLogger logr.Logger, cr *undermoonv1al
 		return storage, errRetryReconciliation
 	}
 
-	storage, err := con.updateStorageDeployment(reqLogger, cr, storage)
+	storage, err := con.updateStorageStatefulSet(reqLogger, cr, storage)
 	if err != nil {
-		if errors.IsConflict(err) {
-			reqLogger.Info("Conflict on updating storage deployment. Try again.", "error", err)
-			return nil, errRetryReconciliation
-		}
-		reqLogger.Error(err, "failed to update storage deployment", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return nil, err
 	}
 	return storage, nil
 }
 
-func (con *storageController) updateStorageDeployment(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, storage *appsv1.Deployment) (*appsv1.Deployment, error) {
+func (con *storageController) updateStorageStatefulSet(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, storage *appsv1.StatefulSet) (*appsv1.StatefulSet, error) {
 	replicaNum := int32(cr.Spec.ChunkNumber) * 2
 	storage.Spec.Replicas = &replicaNum
 
 	err := con.r.client.Update(context.TODO(), storage)
 	if err != nil {
-		reqLogger.Error(err, "failed to update storage deployment", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		if errors.IsConflict(err) {
+			reqLogger.Info("Conflict on updating storage StatefulSet. Try again.")
+			return nil, errRetryReconciliation
+		}
+		reqLogger.Error(err, "failed to update storage StatefulSet", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return nil, err
 	}
 
@@ -165,37 +164,48 @@ func (con *storageController) getServiceEndpointsNum(storageService *corev1.Serv
 	return len(endpoints), nil
 }
 
-func (con *storageController) storageReady(storageDeployment *appsv1.Deployment, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) (bool, error) {
+func (con *storageController) storageReady(storage *appsv1.StatefulSet, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) (bool, error) {
 	n, err := con.getServiceEndpointsNum(storageService)
 	if err != nil {
 		return false, err
 	}
 	serverProxyNum := cr.Spec.ChunkNumber * 2
-	ready := storageDeployment.Status.ReadyReplicas >= int32(serverProxyNum)-1 && n >= int(serverProxyNum-1)
+	ready := storage.Status.ReadyReplicas >= int32(serverProxyNum)-1 && n >= int(serverProxyNum-1)
 	return ready, nil
 }
 
-func (con *storageController) storageAllReady(storageDeployment *appsv1.Deployment, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) (bool, error) {
+func (con *storageController) storageAllReady(storage *appsv1.StatefulSet, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) (bool, error) {
 	n, err := con.getServiceEndpointsNum(storageService)
 	if err != nil {
 		return false, err
 	}
 	serverProxyNum := cr.Spec.ChunkNumber * 2
-	ready := storageDeployment.Status.ReadyReplicas >= int32(serverProxyNum) && n >= int(serverProxyNum)
+	ready := storage.Status.ReadyReplicas >= int32(serverProxyNum) && n >= int(serverProxyNum)
 	return ready, err
 }
 
-func (con *storageController) getServerProxiesIPs(reqLogger logr.Logger, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) ([]string, error) {
+func (con *storageController) getServerProxiesIPs(reqLogger logr.Logger, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) ([]serverProxyMeta, error) {
 	endpoints, err := getEndpoints(con.r.client, storageService.Name, storageService.Namespace)
 	if err != nil {
-		reqLogger.Error(err, "Failed to get endpoints of server proxies", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		reqLogger.Error(err, "Failed to get endpoints of server proxies", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return nil, err
 	}
 
-	ips := []string{}
+	proxies := []serverProxyMeta{}
 	for _, endpoint := range endpoints {
-		ips = append(ips, endpoint.IP)
+		// endpoint.Hostname is in the format of "<name>-storage-ss-<statefulset index>"
+		// The prefix is the same as the result of the StorageStatefulSetName() function.
+		hostname := endpoint.Hostname
+		indexStr := hostname[strings.LastIndex(hostname, "-")+1:]
+		index, err := strconv.ParseInt(indexStr, 10, 64)
+		if err != nil {
+			reqLogger.Error(err, "failed to parse storage hostname", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		}
+		address := genStorageFQDNFromName(hostname, cr)
+		// address := endpoint.IP
+		proxy := newServerProxyMeta(address, address, int(index))
+		proxies = append(proxies, proxy)
 	}
 
-	return ips, nil
+	return proxies, nil
 }

@@ -136,11 +136,11 @@ func (con *memBrokerController) brokerAllReady(brokerStatefulSet *appsv1.Statefu
 	return ready, err
 }
 
-func (con *memBrokerController) reconcileMaster(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, brokerService *corev1.Service) (string, error) {
+func (con *memBrokerController) reconcileMaster(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, brokerService *corev1.Service) (string, []string, error) {
 	endpoints, err := getEndpoints(con.r.client, brokerService.Name, brokerService.Namespace)
 	if err != nil {
 		reqLogger.Error(err, "failed to get broker endpoints", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
-		return "", err
+		return "", nil, err
 	}
 	brokerAddresses := make([]string, 0)
 	for _, endpoint := range endpoints {
@@ -151,14 +151,14 @@ func (con *memBrokerController) reconcileMaster(reqLogger logr.Logger, cr *under
 	currMaster, err := con.getCurrentMaster(reqLogger, brokerAddresses)
 	if err != nil {
 		reqLogger.Error(err, "failed to get current master", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
-		return "", err
+		return "", nil, err
 	}
 	err = con.setMasterBrokerStatus(reqLogger, cr, currMaster)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	return currMaster, nil
+	return currMaster, brokerAddresses, nil
 }
 
 func (con *memBrokerController) setMasterBrokerStatus(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, masterBrokerAddress string) error {

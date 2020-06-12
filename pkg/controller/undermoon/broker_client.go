@@ -10,6 +10,7 @@ import (
 
 const errStrAlreadyExists = "ALREADY_EXISTED"
 const errStrMigrationRunning = "MIGRATION_RUNNING"
+const errNoAvailableResource = "NO_AVAILABLE_RESOURCE"
 
 var errMigrationRunning = errors.New("MIGRATION_RUNNING")
 
@@ -116,18 +117,42 @@ func (client *brokerClient) getServerProxies(address string) ([]string, error) {
 type serverProxyMeta struct {
 	ProxyAddress   string    `json:"proxy_address"`
 	RedisAddresses [2]string `json:"nodes"`
-	Host           string    `host:"host"`
+	Host           string    `json:"host"`
+	Index          int       `json:"index"`
 }
 
-func newServerProxyMeta(ip, nodeIP string) serverProxyMeta {
+func newServerProxyMeta(ip, nodeIP string, index int) serverProxyMeta {
 	return serverProxyMeta{
 		ProxyAddress: fmt.Sprintf("%s:%d", ip, serverProxyPort),
 		RedisAddresses: [2]string{
 			fmt.Sprintf("%s:%d", ip, redisPort1),
 			fmt.Sprintf("%s:%d", ip, redisPort2),
 		},
-		Host: nodeIP,
+		Host:  nodeIP,
+		Index: index,
 	}
+}
+
+type brokerConfigPayload struct {
+	ReplicaAddresses []string `json:"replica_addresses"`
+}
+
+func (client *brokerClient) setBrokerReplicas(address string, replicaAddresses []string) error {
+	url := fmt.Sprintf("http://%s/api/v2/config", address)
+	payload := brokerConfigPayload{
+		ReplicaAddresses: replicaAddresses,
+	}
+	res, err := client.httpClient.R().SetBody(&payload).Put(url)
+	if err != nil {
+		return err
+	}
+
+	if res.StatusCode() != 200 {
+		content := res.Body()
+		return errors.Errorf("Failed to register server proxy: invalid status code %d: %s", res.StatusCode(), string(content))
+	}
+
+	return nil
 }
 
 func (client *brokerClient) registerServerProxy(address string, proxy serverProxyMeta) error {
@@ -146,7 +171,7 @@ func (client *brokerClient) registerServerProxy(address string, proxy serverProx
 }
 
 func (client *brokerClient) deregisterServerProxy(address string, proxyAddress string) error {
-	url := fmt.Sprintf("http://%s/api/v2/proxies/meta", address)
+	url := fmt.Sprintf("http://%s/api/v2/proxies/meta/%s", address, proxyAddress)
 	res, err := client.httpClient.R().Delete(url)
 	if err != nil {
 		return err
@@ -180,6 +205,9 @@ func (client *brokerClient) createCluster(address, clusterName string, chunkNumb
 
 	if res.StatusCode() == 409 {
 		response, ok := res.Error().(*errorResponse)
+		if ok && response.Error == errNoAvailableResource {
+			return errRetryReconciliation
+		}
 		if ok && response.Error == errStrAlreadyExists {
 			return nil
 		}
@@ -251,7 +279,7 @@ type clusterInfo struct {
 
 func (client *brokerClient) getClusterInfo(address, clusterName string) (*clusterInfo, error) {
 	url := fmt.Sprintf("http://%s/api/v2/clusters/info/%s", address, clusterName)
-	res, err := client.httpClient.R().SetResult(&clusterInfo{}).SetError(&errorResponse{}).Post(url)
+	res, err := client.httpClient.R().SetResult(&clusterInfo{}).SetError(&errorResponse{}).Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +295,7 @@ func (client *brokerClient) getClusterInfo(address, clusterName string) (*cluste
 	if res.StatusCode() == 404 {
 		response, ok := res.Error().(*errorResponse)
 		if ok {
-			return nil, errors.Errorf("failed to get cluster info, error code %s", response.Error)
+			return nil, errors.Errorf("cluster info not found, error code %s", response.Error)
 		}
 	}
 

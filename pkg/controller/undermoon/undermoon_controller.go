@@ -114,6 +114,9 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 
 	resource, err := r.createResources(reqLogger, instance)
 	if err != nil {
+		if err == errRetryReconciliation {
+			return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
+		}
 		return reconcile.Result{}, err
 	}
 
@@ -125,7 +128,7 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
 	}
 
-	masterBrokerAddress, err := r.brokerCon.reconcileMaster(reqLogger, instance, resource.brokerService)
+	masterBrokerAddress, replicaAddresses, err := r.brokerCon.reconcileMaster(reqLogger, instance, resource.brokerService)
 	if err != nil {
 		if err == errRetryReconciliation {
 			return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
@@ -138,22 +141,33 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	proxyIPs, err := r.storageCon.getServerProxiesIPs(reqLogger, resource.storageService, instance)
+	proxies, err := r.storageCon.getServerProxiesIPs(reqLogger, resource.storageService, instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	err = r.metaCon.reconcileMeta(reqLogger, masterBrokerAddress, proxyIPs, instance)
+	storageAllReady, err := r.storageCon.storageAllReady(resource.storageStatefulSet, resource.storageService, instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	resource.storageDeployment, err = r.storageCon.updateStorageDeployment(reqLogger, instance, resource.storageDeployment)
+	info, err := r.metaCon.reconcileMeta(reqLogger, masterBrokerAddress, replicaAddresses, proxies, instance, storageAllReady)
 	if err != nil {
+		if err == errRetryReconciliation {
+			return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
+		}
 		return reconcile.Result{}, err
 	}
 
 	err = r.metaCon.changeMeta(reqLogger, masterBrokerAddress, instance)
+	if err != nil {
+		if err == errRetryReconciliation {
+			return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
+		}
+		return reconcile.Result{}, err
+	}
+
+	resource.storageStatefulSet, err = r.storageCon.scaleDown(reqLogger, instance, resource.storageStatefulSet, info)
 	if err != nil {
 		if err == errRetryReconciliation {
 			return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
@@ -167,7 +181,7 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 type umResource struct {
 	brokerStatefulSet      *appsv1.StatefulSet
 	coordinatorStatefulSet *appsv1.StatefulSet
-	storageDeployment      *appsv1.Deployment
+	storageStatefulSet     *appsv1.StatefulSet
 	brokerService          *corev1.Service
 	coordinatorService     *corev1.Service
 	storageService         *corev1.Service
@@ -186,7 +200,7 @@ func (r *ReconcileUndermoon) createResources(reqLogger logr.Logger, instance *un
 		return nil, err
 	}
 
-	storageDeployment, storageService, err := r.storageCon.createStorage(reqLogger, instance)
+	storageStatefulSet, storageService, err := r.storageCon.createStorage(reqLogger, instance)
 	if err != nil {
 		reqLogger.Error(err, "failed to create storage", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return nil, err
@@ -195,7 +209,7 @@ func (r *ReconcileUndermoon) createResources(reqLogger logr.Logger, instance *un
 	return &umResource{
 		brokerStatefulSet:      brokerStatefulSet,
 		coordinatorStatefulSet: coordinatorStatefulSet,
-		storageDeployment:      storageDeployment,
+		storageStatefulSet:     storageStatefulSet,
 		brokerService:          brokerService,
 		coordinatorService:     coordinatorService,
 		storageService:         storageService,
@@ -223,13 +237,13 @@ func (r *ReconcileUndermoon) resourceReady(resource *umResource, reqLogger logr.
 		return false, nil
 	}
 
-	ready, err = r.storageCon.storageReady(resource.storageDeployment, resource.storageService, instance)
+	ready, err = r.storageCon.storageReady(resource.storageStatefulSet, resource.storageService, instance)
 	if err != nil {
 		reqLogger.Error(err, "failed to check storage ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return false, err
 	}
 	if !ready {
-		reqLogger.Info("storage deployment not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
+		reqLogger.Info("storage StatefulSet not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
 		return false, nil
 	}
 	return true, nil

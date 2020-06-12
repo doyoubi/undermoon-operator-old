@@ -14,17 +14,40 @@ func newMetaController() *metaController {
 	return &metaController{client: client}
 }
 
-func (con *metaController) reconcileMeta(reqLogger logr.Logger, masterBrokerAddress string, proxyIPs []string, cr *undermoonv1alpha1.Undermoon) error {
-	err := con.reconcileServerProxyRegistry(reqLogger, masterBrokerAddress, proxyIPs, cr)
+func (con *metaController) reconcileMeta(reqLogger logr.Logger, masterBrokerAddress string, replicaAddresses []string, proxies []serverProxyMeta, cr *undermoonv1alpha1.Undermoon, storageAllReady bool) (*clusterInfo, error) {
+	err := con.setBrokerReplicas(reqLogger, masterBrokerAddress, replicaAddresses, cr)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	err = con.reconcileServerProxyRegistry(reqLogger, masterBrokerAddress, proxies, cr)
+	if err != nil {
+		return nil, err
+	}
+
+	if !storageAllReady {
+		return nil, errRetryReconciliation
 	}
 
 	err = con.createCluster(reqLogger, masterBrokerAddress, cr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	info, err := con.getClusterInfo(reqLogger, masterBrokerAddress, cr)
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
+func (con *metaController) setBrokerReplicas(reqLogger logr.Logger, masterBrokerAddress string, replicaAddresses []string, cr *undermoonv1alpha1.Undermoon) error {
+	err := con.client.setBrokerReplicas(masterBrokerAddress, replicaAddresses)
+	if err != nil {
+		reqLogger.Error(err, "failed to set broker replicas", "masterBrokerAddress", masterBrokerAddress, "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		return err
+	}
 	return nil
 }
 
@@ -42,12 +65,7 @@ func (con *metaController) changeMeta(reqLogger logr.Logger, masterBrokerAddress
 	return nil
 }
 
-func (con *metaController) reconcileServerProxyRegistry(reqLogger logr.Logger, masterBrokerAddress string, proxyIPs []string, cr *undermoonv1alpha1.Undermoon) error {
-	proxies := []serverProxyMeta{}
-	for _, ip := range proxyIPs {
-		proxies = append(proxies, newServerProxyMeta(ip, ip))
-	}
-
+func (con *metaController) reconcileServerProxyRegistry(reqLogger logr.Logger, masterBrokerAddress string, proxies []serverProxyMeta, cr *undermoonv1alpha1.Undermoon) error {
 	err := con.registerServerProxies(reqLogger, masterBrokerAddress, proxies, cr)
 	if err != nil {
 		return err
@@ -134,13 +152,25 @@ func (con *metaController) changeNodeNumber(reqLogger logr.Logger, masterBrokerA
 
 	err := con.client.scaleNodes(masterBrokerAddress, clusterName, chunkNumber)
 	if err != nil {
-		if err != errMigrationRunning {
-			reqLogger.Error(err, "failed to scale nodes",
-				"Name", cr.ObjectMeta.Name,
-				"ClusterName", cr.Spec.ClusterName)
+		if err == errMigrationRunning {
+			return errRetryReconciliation
 		}
+		reqLogger.Error(err, "failed to scale nodes",
+			"Name", cr.ObjectMeta.Name,
+			"ClusterName", cr.Spec.ClusterName)
 		return err
 	}
 
 	return nil
+}
+
+func (con *metaController) getClusterInfo(reqLogger logr.Logger, masterBrokerAddress string, cr *undermoonv1alpha1.Undermoon) (*clusterInfo, error) {
+	info, err := con.client.getClusterInfo(masterBrokerAddress, cr.Spec.ClusterName)
+	if err != nil {
+		reqLogger.Error(err, "failed to get cluster info",
+			"Name", cr.ObjectMeta.Name,
+			"ClusterName", cr.Spec.ClusterName)
+		return nil, err
+	}
+	return info, nil
 }
