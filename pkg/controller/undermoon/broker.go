@@ -101,6 +101,10 @@ func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSe
 			Value: "5",
 		},
 		{
+			Name:  "UNDERMOON_ENABLE_ORDERED_PROXY",
+			Value: "true",
+		},
+		{
 			Name:  "UNDERMOON_DEBUG",
 			Value: "false",
 		},

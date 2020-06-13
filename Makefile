@@ -46,13 +46,13 @@ debug-edit:
 	kubectl edit undermoon/example-undermoon
 
 run-busybox:
-	kubectl run -i --tty --rm debug --image=busybox --restart=Never -- sh
+	kubectl run -i --tty --rm debug-busybox --image=busybox --restart=Never -- sh
 
 run-jq-curl:
-	kubectl run -i --tty --rm debug --image=dwdraju/alpine-curl-jq --restart=Never -- sh
+	kubectl run -i --tty --rm debug-jq-curl --image=dwdraju/alpine-curl-jq --restart=Never -- sh
 
 run-redis-cli:
-	kubectl run -i --tty --rm debug --image=redis --restart=Never -- sh
+	kubectl run -i --tty --rm debug-redis-cli --image=redis --restart=Never -- sh
 
 .PHONY: build test lint update-types minikube-env debug-run debug-start debug-stop
 
