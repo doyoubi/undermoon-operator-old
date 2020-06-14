@@ -141,7 +141,7 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	proxies, err := r.storageCon.getServerProxiesIPs(reqLogger, resource.storageService, instance)
+	proxies, err := r.storageCon.getServerProxies(reqLogger, resource.storageService, instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -159,7 +159,7 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	err = r.metaCon.changeMeta(reqLogger, masterBrokerAddress, instance)
+	err = r.metaCon.changeMeta(reqLogger, masterBrokerAddress, instance, info)
 	if err != nil {
 		if err == errRetryReconciliation {
 			return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
@@ -167,7 +167,7 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	resource.storageStatefulSet, err = r.storageCon.scaleDown(reqLogger, instance, resource.storageStatefulSet, info)
+	resource.storageStatefulSet, err = r.storageCon.scaleDownStorageStatefulSet(reqLogger, instance, resource.storageStatefulSet, info)
 	if err != nil {
 		if err == errRetryReconciliation {
 			return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil

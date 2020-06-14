@@ -121,12 +121,12 @@ type serverProxyMeta struct {
 	Index          int       `json:"index"`
 }
 
-func newServerProxyMeta(ip, nodeIP string, index int) serverProxyMeta {
+func newServerProxyMeta(podHost, nodeIP string, index int) serverProxyMeta {
 	return serverProxyMeta{
-		ProxyAddress: fmt.Sprintf("%s:%d", ip, serverProxyPort),
+		ProxyAddress: fmt.Sprintf("%s:%d", podHost, serverProxyPort),
 		RedisAddresses: [2]string{
-			fmt.Sprintf("%s:%d", ip, redisPort1),
-			fmt.Sprintf("%s:%d", ip, redisPort2),
+			fmt.Sprintf("%s:%d", podHost, redisPort1),
+			fmt.Sprintf("%s:%d", podHost, redisPort2),
 		},
 		Host:  nodeIP,
 		Index: index,

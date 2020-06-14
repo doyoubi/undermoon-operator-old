@@ -120,7 +120,7 @@ func (con *storageController) getOrCreateStorageStatefulSet(reqLogger logr.Logge
 	return found, nil
 }
 
-func (con *storageController) scaleDown(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, storage *appsv1.StatefulSet, info *clusterInfo) (*appsv1.StatefulSet, error) {
+func (con *storageController) scaleDownStorageStatefulSet(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, storage *appsv1.StatefulSet, info *clusterInfo) (*appsv1.StatefulSet, error) {
 	expectedNodeNumber := int(cr.Spec.ChunkNumber) * chunkNodeNumber
 	if info.NodeNumberWithSlots > expectedNodeNumber {
 		reqLogger.Info("Need to wait for slot migration to scale down storage", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
@@ -184,7 +184,7 @@ func (con *storageController) storageAllReady(storage *appsv1.StatefulSet, stora
 	return ready, err
 }
 
-func (con *storageController) getServerProxiesIPs(reqLogger logr.Logger, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) ([]serverProxyMeta, error) {
+func (con *storageController) getServerProxies(reqLogger logr.Logger, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) ([]serverProxyMeta, error) {
 	endpoints, err := getEndpoints(con.r.client, storageService.Name, storageService.Namespace)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get endpoints of server proxies", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
@@ -202,7 +202,6 @@ func (con *storageController) getServerProxiesIPs(reqLogger logr.Logger, storage
 			reqLogger.Error(err, "failed to parse storage hostname", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		}
 		address := genStorageFQDNFromName(hostname, cr)
-		// address := endpoint.IP
 		proxy := newServerProxyMeta(address, address, int(index))
 		proxies = append(proxies, proxy)
 	}

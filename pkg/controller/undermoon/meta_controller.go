@@ -51,8 +51,10 @@ func (con *metaController) setBrokerReplicas(reqLogger logr.Logger, masterBroker
 	return nil
 }
 
-func (con *metaController) changeMeta(reqLogger logr.Logger, masterBrokerAddress string, cr *undermoonv1alpha1.Undermoon) error {
-	// TODO: wait for running migration
+func (con *metaController) changeMeta(reqLogger logr.Logger, masterBrokerAddress string, cr *undermoonv1alpha1.Undermoon, info *clusterInfo) error {
+	if info.IsMigrating {
+		return errRetryReconciliation
+	}
 
 	err := con.changeNodeNumber(reqLogger, masterBrokerAddress, cr)
 	if err != nil {

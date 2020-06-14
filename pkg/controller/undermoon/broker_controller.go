@@ -158,7 +158,15 @@ func (con *memBrokerController) reconcileMaster(reqLogger logr.Logger, cr *under
 		return "", nil, err
 	}
 
-	return currMaster, brokerAddresses, nil
+	replicaAddresses := make([]string, 0)
+	for _, address := range brokerAddresses {
+		if address == currMaster {
+			continue
+		}
+		replicaAddresses = append(replicaAddresses, address)
+	}
+
+	return currMaster, replicaAddresses, nil
 }
 
 func (con *memBrokerController) setMasterBrokerStatus(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, masterBrokerAddress string) error {
