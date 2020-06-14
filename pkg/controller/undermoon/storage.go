@@ -141,7 +141,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 		},
 	}
 
-	replicaNum := int32(cr.Spec.ChunkNumber) * 2
+	replicaNum := int32(int(cr.Spec.ChunkNumber) * halfChunkNodeNumber)
 
 	return &appsv1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
@@ -191,6 +191,15 @@ func StorageStatefulSetName(undermoonName string) string {
 	return fmt.Sprintf("%s-storage-ss", undermoonName)
 }
 
+func genStorageNames(clusterName string, replicas int) []string {
+	names := []string{}
+	for i := 0; i != replicas; i++ {
+		name := fmt.Sprintf("%s-%d", StorageStatefulSetName(clusterName), i)
+		names = append(names, name)
+	}
+	return names
+}
+
 func genStorageFQDN(storageName, clusterName, namespace string) string {
 	// pod-specific-string.serviceName.default.svc.cluster.local
 	return fmt.Sprintf("%s.%s.%s.svc.cluster.local", storageName, StorageServiceName(clusterName), namespace)
@@ -205,4 +214,14 @@ func genStorageAddressFromName(name string, cr *undermoonv1alpha1.Undermoon) str
 	host := genStorageFQDNFromName(name, cr)
 	addr := fmt.Sprintf("%s:%d", host, serverProxyPort)
 	return addr
+}
+
+func genStorageStatefulSetAddrs(cr *undermoonv1alpha1.Undermoon) []string {
+	addrs := []string{}
+	replicaNum := int(cr.Spec.ChunkNumber) * halfChunkNodeNumber
+	for _, name := range genStorageNames(cr.ObjectMeta.Name, replicaNum) {
+		addr := genStorageAddressFromName(name, cr)
+		addrs = append(addrs, addr)
+	}
+	return addrs
 }

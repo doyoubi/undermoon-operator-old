@@ -142,7 +142,7 @@ func (con *storageController) scaleDownStorageStatefulSet(reqLogger logr.Logger,
 }
 
 func (con *storageController) updateStorageStatefulSet(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, storage *appsv1.StatefulSet) (*appsv1.StatefulSet, error) {
-	replicaNum := int32(cr.Spec.ChunkNumber) * 2
+	replicaNum := int32(int(cr.Spec.ChunkNumber) * halfChunkNodeNumber)
 	storage.Spec.Replicas = &replicaNum
 
 	err := con.r.client.Update(context.TODO(), storage)
@@ -171,7 +171,7 @@ func (con *storageController) storageReady(storage *appsv1.StatefulSet, storageS
 	if err != nil {
 		return false, err
 	}
-	serverProxyNum := cr.Spec.ChunkNumber * 2
+	serverProxyNum := int32(int(cr.Spec.ChunkNumber) * halfChunkNodeNumber)
 	ready := storage.Status.ReadyReplicas >= int32(serverProxyNum)-1 && n >= int(serverProxyNum-1)
 	return ready, nil
 }
@@ -181,7 +181,7 @@ func (con *storageController) storageAllReady(storage *appsv1.StatefulSet, stora
 	if err != nil {
 		return false, err
 	}
-	serverProxyNum := cr.Spec.ChunkNumber * 2
+	serverProxyNum := int32(int(cr.Spec.ChunkNumber) * halfChunkNodeNumber)
 	ready := storage.Status.ReadyReplicas >= int32(serverProxyNum) && n >= int(serverProxyNum)
 	return ready, err
 }
@@ -201,7 +201,7 @@ func (con *storageController) getServerProxies(reqLogger logr.Logger, storageSer
 		indexStr := hostname[strings.LastIndex(hostname, "-")+1:]
 		index, err := strconv.ParseInt(indexStr, 10, 64)
 		if err != nil {
-			reqLogger.Error(err, "failed to parse storage hostname", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+			reqLogger.Error(err, "failed to parse storage hostname", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		}
 		address := genStorageFQDNFromName(hostname, cr)
 		proxy := newServerProxyMeta(address, address, int(index))
@@ -223,7 +223,7 @@ func (con *storageController) getMaxEpoch(reqLogger logr.Logger, storageService 
 		address := genStorageAddressFromName(endpoint.Hostname, cr)
 		epoch, err := con.proxyPool.getEpoch(address)
 		if err != nil {
-			reqLogger.Error(err, "Failed to get epoch from server proxy", "proxyAddress", address, cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+			reqLogger.Error(err, "Failed to get epoch from server proxy", "proxyAddress", address, "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		}
 		if epoch > maxEpoch {
 			maxEpoch = epoch

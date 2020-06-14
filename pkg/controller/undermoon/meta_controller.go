@@ -48,6 +48,14 @@ func (con *metaController) setBrokerReplicas(reqLogger logr.Logger, masterBroker
 		reqLogger.Error(err, "failed to set broker replicas", "masterBrokerAddress", masterBrokerAddress, "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		return err
 	}
+
+	for _, replicaAddress := range replicaAddresses {
+		err := con.client.setBrokerReplicas(replicaAddress, []string{})
+		if err != nil {
+			reqLogger.Error(err, "failed to set broker replicas", "replicaBrokerAddress", replicaAddress, "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+			return err
+		}
+	}
 	return nil
 }
 
@@ -101,6 +109,11 @@ func (con *metaController) deregisterServerProxies(reqLogger logr.Logger, master
 	}
 
 	keepSet := make(map[string]bool, 0)
+	// Need to include the failed but still in use proxies.
+	for _, proxyAddress := range genStorageStatefulSetAddrs(cr) {
+		keepSet[proxyAddress] = true
+	}
+	// Need to include the proxies waiting to scale down.
 	for _, proxy := range proxies {
 		keepSet[proxy.ProxyAddress] = true
 	}
