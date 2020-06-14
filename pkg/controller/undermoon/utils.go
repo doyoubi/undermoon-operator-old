@@ -2,7 +2,9 @@ package undermoon
 
 import (
 	"context"
+	"sync"
 
+	"github.com/go-redis/redis/v8"
 	pkgerrors "github.com/pkg/errors"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -78,4 +80,31 @@ func podIPEnv() corev1.EnvVar {
 			},
 		},
 	}
+}
+
+type redisClientPool struct {
+	lock    sync.Mutex
+	clients map[string]*redis.Client
+}
+
+func newRedisClientPool() *redisClientPool {
+	return &redisClientPool{
+		lock:    sync.Mutex{},
+		clients: make(map[string]*redis.Client),
+	}
+}
+
+func (pool *redisClientPool) getClient(redisAddress string) *redis.Client {
+	pool.lock.Lock()
+	defer pool.lock.Unlock()
+
+	if client, ok := pool.clients[redisAddress]; ok {
+		return client
+	}
+
+	client := redis.NewClient(&redis.Options{
+		Addr: redisAddress,
+	})
+	pool.clients[redisAddress] = client
+	return client
 }

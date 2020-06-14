@@ -15,11 +15,13 @@ import (
 )
 
 type storageController struct {
-	r *ReconcileUndermoon
+	r         *ReconcileUndermoon
+	proxyPool *serverProxyClientPool
 }
 
 func newStorageController(r *ReconcileUndermoon) *storageController {
-	return &storageController{r: r}
+	pool := newServerProxyClientPool()
+	return &storageController{r: r, proxyPool: pool}
 }
 
 func (con *storageController) createStorage(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, *corev1.Service, error) {
@@ -207,4 +209,26 @@ func (con *storageController) getServerProxies(reqLogger logr.Logger, storageSer
 	}
 
 	return proxies, nil
+}
+
+func (con *storageController) getLargestEpoch(reqLogger logr.Logger, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) (int64, error) {
+	endpoints, err := getEndpoints(con.r.client, storageService.Name, storageService.Namespace)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get endpoints of server proxies", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		return 0, err
+	}
+
+	var maxEpoch int64 = 0
+	for _, endpoint := range endpoints {
+		address := genStorageAddressFromName(endpoint.Hostname, cr)
+		epoch, err := con.proxyPool.getEpoch(address)
+		if err != nil {
+			reqLogger.Error(err, "Failed to get epoch from server proxy", "proxyAddress", address, cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
+		}
+		if epoch > maxEpoch {
+			maxEpoch = epoch
+		}
+	}
+
+	return maxEpoch, nil
 }

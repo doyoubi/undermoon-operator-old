@@ -200,3 +200,9 @@ func genStorageFQDNFromName(name string, cr *undermoonv1alpha1.Undermoon) string
 	host := genStorageFQDN(name, cr.ObjectMeta.Name, cr.ObjectMeta.Namespace)
 	return host
 }
+
+func genStorageAddressFromName(name string, cr *undermoonv1alpha1.Undermoon) string {
+	host := genStorageFQDNFromName(name, cr)
+	addr := fmt.Sprintf("%s:%d", host, serverProxyPort)
+	return addr
+}
