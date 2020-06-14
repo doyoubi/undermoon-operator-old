@@ -211,7 +211,7 @@ func (con *storageController) getServerProxies(reqLogger logr.Logger, storageSer
 	return proxies, nil
 }
 
-func (con *storageController) getLargestEpoch(reqLogger logr.Logger, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) (int64, error) {
+func (con *storageController) getMaxEpoch(reqLogger logr.Logger, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) (int64, error) {
 	endpoints, err := getEndpoints(con.r.client, storageService.Name, storageService.Namespace)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get endpoints of server proxies", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)

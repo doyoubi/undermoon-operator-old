@@ -176,3 +176,27 @@ func (con *metaController) getClusterInfo(reqLogger logr.Logger, masterBrokerAdd
 	}
 	return info, nil
 }
+
+func (con *metaController) fixBrokerEpoch(reqLogger logr.Logger, masterBrokerAddress string, maxEpochFromServerProxy int64, cr *undermoonv1alpha1.Undermoon) error {
+	epoch, err := con.client.getEpoch(masterBrokerAddress)
+	if err != nil {
+		reqLogger.Error(err, "failed to get global epoch from broker",
+			"Name", cr.ObjectMeta.Name,
+			"ClusterName", cr.Spec.ClusterName)
+		return err
+	}
+
+	if epoch >= maxEpochFromServerProxy {
+		return nil
+	}
+
+	err = con.client.fixEpoch(masterBrokerAddress)
+	if err != nil {
+		reqLogger.Error(err, "failed to fix broker global epoch",
+			"Name", cr.ObjectMeta.Name,
+			"ClusterName", cr.Spec.ClusterName)
+		return err
+	}
+
+	return nil
+}

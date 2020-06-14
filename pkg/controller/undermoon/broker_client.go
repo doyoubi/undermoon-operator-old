@@ -74,7 +74,7 @@ func (client *brokerClient) storeReplicaAddresses(address string, replicaAddress
 	return nil
 }
 
-func (client *brokerClient) getEpoch(address string) (uint64, error) {
+func (client *brokerClient) getEpoch(address string) (int64, error) {
 	url := fmt.Sprintf("http://%s/api/v2/epoch", address)
 	res, err := client.httpClient.R().Get(url)
 	if err != nil {
@@ -86,7 +86,7 @@ func (client *brokerClient) getEpoch(address string) (uint64, error) {
 	}
 
 	body := res.Body()
-	epoch, err := strconv.ParseUint(string(body), 10, 64)
+	epoch, err := strconv.ParseInt(string(body), 10, 64)
 	if err != nil {
 		return 0, errors.Errorf("Invalid epoch from broker: %s", string(body))
 	}
@@ -301,5 +301,19 @@ func (client *brokerClient) getClusterInfo(address, clusterName string) (*cluste
 
 	content := res.Body()
 	return nil, errors.Errorf("Failed to get cluster info: invalid status code %d: %s", res.StatusCode(), string(content))
+}
 
+func (client *brokerClient) fixEpoch(address string) error {
+	url := fmt.Sprintf("http://%s/api/v2/epoch/recovery", address)
+	res, err := client.httpClient.R().SetResult(&clusterInfo{}).SetError(&errorResponse{}).Put(url)
+	if err != nil {
+		return err
+	}
+
+	if res.StatusCode() == 200 {
+		return nil
+	}
+
+	content := res.Body()
+	return errors.Errorf("Failed to get cluster info: invalid status code %d: %s", res.StatusCode(), string(content))
 }

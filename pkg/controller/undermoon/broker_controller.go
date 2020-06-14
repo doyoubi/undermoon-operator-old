@@ -208,7 +208,7 @@ func (con *memBrokerController) getCurrentMaster(reqLogger logr.Logger, brokerAd
 		masterBrokers = append(masterBrokers, brokerAddresses...)
 	}
 
-	var maxEpoch uint64 = 0
+	var maxEpoch int64 = 0
 	maxEpochBroker := ""
 	for _, address := range masterBrokers {
 		epoch, err := con.client.getEpoch(address)
