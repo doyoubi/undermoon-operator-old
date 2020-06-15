@@ -177,6 +177,16 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
+	// Ignore the proxies fetched from service.
+	proxies = []serverProxyMeta{}
+	info, err = r.metaCon.reconcileMeta(reqLogger, masterBrokerAddress, replicaAddresses, proxies, instance, storageAllReady)
+	if err != nil {
+		if err == errRetryReconciliation {
+			return reconcile.Result{Requeue: true, RequeueAfter: 3 * time.Second}, nil
+		}
+		return reconcile.Result{}, err
+	}
+
 	resource.storageStatefulSet, err = r.storageCon.scaleDownStorageStatefulSet(reqLogger, instance, resource.storageStatefulSet, info)
 	if err != nil {
 		if err == errRetryReconciliation {
