@@ -52,12 +52,17 @@ spec:
             undermoonImage:
               minLength: 1
               type: string
+            undermoonImagePullPolicy:
+              description: PullPolicy describes a policy for if/when to pull a container
+                image
+              type: string
           required:
           - chunkNumber
           - clusterName
           - maxMemory
           - redisImage
           - undermoonImage
+          - undermoonImagePullPolicy
           type: object
         status:
           description: UndermoonStatus defines the observed state of Undermoon

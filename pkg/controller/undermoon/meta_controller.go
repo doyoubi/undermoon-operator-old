@@ -166,7 +166,8 @@ func (con *metaController) changeNodeNumber(reqLogger logr.Logger, masterBrokerA
 	clusterName := cr.Spec.ClusterName
 
 	err := con.client.scaleNodes(masterBrokerAddress, clusterName, chunkNumber)
-	if err != nil {
+	retry := err == errFreeNodeFound
+	if err != nil && err != errFreeNodeFound {
 		if err == errMigrationRunning {
 			return errRetryReconciliation
 		}
@@ -174,6 +175,21 @@ func (con *metaController) changeNodeNumber(reqLogger logr.Logger, masterBrokerA
 			"Name", cr.ObjectMeta.Name,
 			"ClusterName", cr.Spec.ClusterName)
 		return err
+	}
+
+	err = con.client.removeFreeNodes(masterBrokerAddress, clusterName)
+	if err != nil {
+		if err == errMigrationRunning {
+			return errRetryReconciliation
+		}
+		reqLogger.Error(err, "failed to remove free nodes",
+			"Name", cr.ObjectMeta.Name,
+			"ClusterName", cr.Spec.ClusterName)
+		return err
+	}
+
+	if retry {
+		return errRetryReconciliation
 	}
 
 	return nil

@@ -16,6 +16,8 @@ const serverProxyContainerName = "server-proxy"
 const redisContainerName = "redis"
 const undermoonServiceTypeStorage = "storage"
 
+// This service is only used internally for getting the created server proxies
+// which have not received UMCTL SETCLUSTER.
 func createStorageService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 	undermoonName := cr.ObjectMeta.Name
 
@@ -43,6 +45,40 @@ func createStorageService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 			},
 			ClusterIP: "None", // Make it a headless service
 			Selector:  labels,
+			// We need to use this service to discover not ready server proxies
+			// and register them in the broker.
+			PublishNotReadyAddresses: true,
+		},
+	}
+}
+
+// This is the service exposed to the users.
+// It only exposes those server proxies which have received UMCTL SETCLUSTER
+// and had metadata set up.
+func createStoragePublicService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
+	undermoonName := cr.ObjectMeta.Name
+
+	labels := map[string]string{
+		"undermoonService":     undermoonServiceTypeStorage,
+		"undermoonName":        undermoonName,
+		"undermoonClusterName": cr.Spec.ClusterName,
+	}
+
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      StoragePublicServiceName(undermoonName),
+			Namespace: cr.Namespace,
+			Labels:    labels,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name:     "server-proxy-public-port",
+					Port:     serverProxyPort,
+					Protocol: corev1.ProtocolTCP,
+				},
+			},
+			Selector: labels,
 		},
 	}
 }
@@ -50,6 +86,11 @@ func createStorageService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 // StorageServiceName defines the service for storage StatefulSet.
 func StorageServiceName(clusterName string) string {
 	return fmt.Sprintf("%s-storage-svc", clusterName)
+}
+
+// StoragePublicServiceName defines the service for storage StatefulSet.
+func StoragePublicServiceName(clusterName string) string {
+	return fmt.Sprintf("%s-storage-public-svc", clusterName)
 }
 
 func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSet {
@@ -118,7 +159,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 	serverProxyContainer := corev1.Container{
 		Name:            serverProxyContainerName,
 		Image:           cr.Spec.UndermoonImage,
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: cr.Spec.UndermoonImagePullPolicy,
 		Command: []string{
 			"sh",
 			"-c",
@@ -128,6 +169,20 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 	}
 	redisContainer1 := genRedisContainer(1, cr.Spec.RedisImage, cr.Spec.MaxMemory, redisPort1)
 	redisContainer2 := genRedisContainer(2, cr.Spec.RedisImage, cr.Spec.MaxMemory, redisPort2)
+
+	// Use the redis-cli in redis container
+	redisContainer1.ReadinessProbe = &corev1.Probe{
+		Handler: corev1.Handler{
+			Exec: &corev1.ExecAction{
+				// Checks whether the server proxy has received UMCTL SETCLUSTER.
+				Command: []string{
+					"sh", "-c", "[ '' != \"$(redis-cli -p 5299 CLUSTER NODES)\" ]",
+				},
+			},
+		},
+		PeriodSeconds: 3,
+	}
+
 	podSpec := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: labels,

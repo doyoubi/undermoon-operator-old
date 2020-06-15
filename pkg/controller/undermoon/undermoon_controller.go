@@ -120,7 +120,7 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	ready, err := r.resourceReady(resource, reqLogger, instance)
+	ready, err := r.brokerAndCoordinatorReady(resource, reqLogger, instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -156,7 +156,7 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	storageAllReady, err := r.storageCon.storageAllReady(resource.storageStatefulSet, resource.storageService, instance)
+	storageAllReady, err := r.storageCon.storageAllReady(resource.storageService, instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -226,7 +226,7 @@ func (r *ReconcileUndermoon) createResources(reqLogger logr.Logger, instance *un
 	}, nil
 }
 
-func (r *ReconcileUndermoon) resourceReady(resource *umResource, reqLogger logr.Logger, instance *undermoonv1alpha1.Undermoon) (bool, error) {
+func (r *ReconcileUndermoon) brokerAndCoordinatorReady(resource *umResource, reqLogger logr.Logger, instance *undermoonv1alpha1.Undermoon) (bool, error) {
 	ready, err := r.brokerCon.brokerReady(resource.brokerStatefulSet, resource.brokerService)
 	if err != nil {
 		reqLogger.Error(err, "failed to check broker ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
@@ -247,14 +247,5 @@ func (r *ReconcileUndermoon) resourceReady(resource *umResource, reqLogger logr.
 		return false, nil
 	}
 
-	ready, err = r.storageCon.storageReady(resource.storageStatefulSet, resource.storageService, instance)
-	if err != nil {
-		reqLogger.Error(err, "failed to check storage ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
-		return false, err
-	}
-	if !ready {
-		reqLogger.Info("storage StatefulSet not ready", "Name", instance.ObjectMeta.Name, "ClusterName", instance.Spec.ClusterName)
-		return false, nil
-	}
 	return true, nil
 }

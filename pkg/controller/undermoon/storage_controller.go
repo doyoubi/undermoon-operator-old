@@ -25,8 +25,13 @@ func newStorageController(r *ReconcileUndermoon) *storageController {
 }
 
 func (con *storageController) createStorage(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*appsv1.StatefulSet, *corev1.Service, error) {
+	_, err := createServiceGuard(func() (*corev1.Service, error) {
+		service := createStoragePublicService(cr)
+		return con.getOrCreateStorageService(reqLogger, cr, service)
+	})
 	storageService, err := createServiceGuard(func() (*corev1.Service, error) {
-		return con.getOrCreateStorageService(reqLogger, cr)
+		service := createStorageService(cr)
+		return con.getOrCreateStorageService(reqLogger, cr, service)
 	})
 	if err != nil {
 		reqLogger.Error(err, "failed to create storage service", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
@@ -55,9 +60,7 @@ func (con *storageController) createStorage(reqLogger logr.Logger, cr *undermoon
 	return storage, storageService, nil
 }
 
-func (con *storageController) getOrCreateStorageService(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon) (*corev1.Service, error) {
-	service := createStorageService(cr)
-
+func (con *storageController) getOrCreateStorageService(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, service *corev1.Service) (*corev1.Service, error) {
 	if err := controllerutil.SetControllerReference(cr, service, con.r.scheme); err != nil {
 		return nil, err
 	}
@@ -166,23 +169,23 @@ func (con *storageController) getServiceEndpointsNum(storageService *corev1.Serv
 	return len(endpoints), nil
 }
 
-func (con *storageController) storageReady(storage *appsv1.StatefulSet, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) (bool, error) {
+func (con *storageController) storageReady(storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) (bool, error) {
 	n, err := con.getServiceEndpointsNum(storageService)
 	if err != nil {
 		return false, err
 	}
 	serverProxyNum := int32(int(cr.Spec.ChunkNumber) * halfChunkNodeNumber)
-	ready := storage.Status.ReadyReplicas >= int32(serverProxyNum)-1 && n >= int(serverProxyNum-1)
+	ready := n >= int(serverProxyNum-1)
 	return ready, nil
 }
 
-func (con *storageController) storageAllReady(storage *appsv1.StatefulSet, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) (bool, error) {
+func (con *storageController) storageAllReady(storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) (bool, error) {
 	n, err := con.getServiceEndpointsNum(storageService)
 	if err != nil {
 		return false, err
 	}
 	serverProxyNum := int32(int(cr.Spec.ChunkNumber) * halfChunkNodeNumber)
-	ready := storage.Status.ReadyReplicas >= int32(serverProxyNum) && n >= int(serverProxyNum)
+	ready := n >= int(serverProxyNum)
 	return ready, err
 }
 
@@ -218,9 +221,18 @@ func (con *storageController) getMaxEpoch(reqLogger logr.Logger, storageService 
 		return 0, err
 	}
 
+	// Filter the proxies being deleted
+	sets := make(map[string]bool)
+	for _, address := range genStorageStatefulSetAddrs(cr) {
+		sets[address] = true
+	}
+
 	var maxEpoch int64 = 0
 	for _, endpoint := range endpoints {
 		address := genStorageAddressFromName(endpoint.Hostname, cr)
+		if _, ok := sets[address]; !ok {
+			continue
+		}
 		epoch, err := con.proxyPool.getEpoch(address)
 		if err != nil {
 			reqLogger.Error(err, "Failed to get epoch from server proxy", "proxyAddress", address, "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)

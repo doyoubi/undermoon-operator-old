@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,7 +24,8 @@ type UndermoonSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	MaxMemory uint32 `json:"maxMemory"`
 	// +kubebuilder:validation:MinLength=1
-	UndermoonImage string `json:"undermoonImage"`
+	UndermoonImage           string            `json:"undermoonImage"`
+	UndermoonImagePullPolicy corev1.PullPolicy `json:"undermoonImagePullPolicy"`
 	// +kubebuilder:validation:MinLength=1
 	RedisImage string `json:"redisImage"`
 }

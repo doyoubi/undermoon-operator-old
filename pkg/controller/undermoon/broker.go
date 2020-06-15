@@ -112,7 +112,7 @@ func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSe
 	container := corev1.Container{
 		Name:            brokerContainerName,
 		Image:           cr.Spec.UndermoonImage,
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: cr.Spec.UndermoonImagePullPolicy,
 		Command:         []string{"mem_broker"},
 		Env:             env,
 	}

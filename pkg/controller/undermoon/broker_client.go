@@ -10,9 +10,12 @@ import (
 
 const errStrAlreadyExists = "ALREADY_EXISTED"
 const errStrMigrationRunning = "MIGRATION_RUNNING"
-const errNoAvailableResource = "NO_AVAILABLE_RESOURCE"
+const errStrNoAvailableResource = "NO_AVAILABLE_RESOURCE"
+const errStrFreeNodeFound = "FREE_NODE_FOUND"
+const errStrFreeNodeNotFound = "FREE_NODE_NOT_FOUND"
 
 var errMigrationRunning = errors.New("MIGRATION_RUNNING")
+var errFreeNodeFound = errors.New("FREE_NODE_FOUND")
 
 type errorResponse struct {
 	Error string `json:"error"`
@@ -205,7 +208,7 @@ func (client *brokerClient) createCluster(address, clusterName string, chunkNumb
 
 	if res.StatusCode() == 409 {
 		response, ok := res.Error().(*errorResponse)
-		if ok && response.Error == errNoAvailableResource {
+		if ok && response.Error == errStrNoAvailableResource {
 			return errRetryReconciliation
 		}
 		if ok && response.Error == errStrAlreadyExists {
@@ -264,10 +267,38 @@ func (client *brokerClient) scaleNodes(address, clusterName string, chunkNumber 
 		if ok && response.Error == errStrMigrationRunning {
 			return errMigrationRunning
 		}
+		if ok && response.Error == errStrFreeNodeFound {
+			return errFreeNodeFound
+		}
 	}
 
 	content := res.Body()
-	return errors.Errorf("Failed to expand slots: invalid status code %d: %s", res.StatusCode(), string(content))
+	return errors.Errorf("Failed to change node number: invalid status code %d: %s", res.StatusCode(), string(content))
+}
+
+func (client *brokerClient) removeFreeNodes(address, clusterName string) error {
+	url := fmt.Sprintf("http://%s/api/v2/clusters/free_nodes/%s", address, clusterName)
+	res, err := client.httpClient.R().SetError(&errorResponse{}).Delete(url)
+	if err != nil {
+		return err
+	}
+
+	if res.StatusCode() == 200 {
+		return nil
+	}
+
+	if res.StatusCode() == 404 || res.StatusCode() == 409 {
+		response, ok := res.Error().(*errorResponse)
+		if ok && response.Error == errStrMigrationRunning {
+			return errMigrationRunning
+		}
+		if ok && response.Error == errStrFreeNodeNotFound {
+			return nil
+		}
+	}
+
+	content := res.Body()
+	return errors.Errorf("Failed to remove free nodes: invalid status code %d: %s", res.StatusCode(), string(content))
 }
 
 type clusterInfo struct {

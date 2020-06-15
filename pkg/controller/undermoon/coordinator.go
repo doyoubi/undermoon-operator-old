@@ -84,7 +84,7 @@ func createCoordinatorStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.State
 	container := corev1.Container{
 		Name:            coordinatorContainerName,
 		Image:           cr.Spec.UndermoonImage,
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: cr.Spec.UndermoonImagePullPolicy,
 		Command:         []string{"coordinator"},
 		Env:             env,
 	}
