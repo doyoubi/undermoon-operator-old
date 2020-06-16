@@ -2,6 +2,7 @@ package undermoon
 
 import (
 	"fmt"
+	"strconv"
 
 	undermoonv1alpha1 "github.com/doyoubi/undermoon-operator/pkg/apis/undermoon/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -154,7 +155,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 		},
 		{
 			Name:  "UNDERMOON_ACTIVE_REDIRECTION",
-			Value: "false",
+			Value: strconv.FormatBool(cr.Spec.ActiveRedirection),
 		},
 	}
 	serverProxyContainer := corev1.Container{

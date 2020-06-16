@@ -28,6 +28,8 @@ type UndermoonSpec struct {
 	UndermoonImagePullPolicy corev1.PullPolicy `json:"undermoonImagePullPolicy"`
 	// +kubebuilder:validation:MinLength=1
 	RedisImage string `json:"redisImage"`
+	// Enable this to let the shards redirect the requests themselves so that the client does not need to support cluster mode.
+	ActiveRedirection bool `json:"activeRedirection"`
 }
 
 // UndermoonStatus defines the observed state of Undermoon

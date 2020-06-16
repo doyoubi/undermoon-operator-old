@@ -3,14 +3,12 @@ package e2e
 import (
 	goctx "context"
 	"fmt"
-	"github.com/pkg/errors"
 	"testing"
 	"time"
 
 	"github.com/doyoubi/undermoon-operator/pkg/apis"
 	operator "github.com/doyoubi/undermoon-operator/pkg/apis/undermoon/v1alpha1"
 	umctrl "github.com/doyoubi/undermoon-operator/pkg/controller/undermoon"
-	"github.com/go-redis/redis/v8"
 
 	framework "github.com/operator-framework/operator-sdk/pkg/test"
 	"github.com/operator-framework/operator-sdk/pkg/test/e2eutil"
@@ -88,21 +86,6 @@ func undermoonScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Tes
 		return err
 	}
 
-	// Test the Redis service
-	publicService, err := f.KubeClient.CoreV1().Services(namespace).Get(storagePublicServiceName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	publicServiceIP := publicService.Spec.ClusterIP
-	err = setKeys(t, publicServiceIP, []string{"a", "b"})
-	if err != nil {
-		return err
-	}
-	err = getKeys(t, publicServiceIP, []string{"a", "b"})
-	if err != nil {
-		return err
-	}
-
 	// scale up to 2 chunks and 4 replicas
 	err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: testUndermoonName, Namespace: namespace}, exampleUndermoon)
 	if err != nil {
@@ -128,16 +111,6 @@ func undermoonScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Tes
 
 	// wait for public service to have 4 endpoints
 	err = waitForServiceEndpoints(t, f.KubeClient, namespace, storagePublicServiceName, 4, retryInterval, timeout)
-	if err != nil {
-		return err
-	}
-
-	// Test the Redis service
-	err = setKeys(t, publicServiceIP, []string{"c", "d"})
-	if err != nil {
-		return err
-	}
-	err = getKeys(t, publicServiceIP, []string{"a", "b", "c", "d"})
 	if err != nil {
 		return err
 	}
@@ -171,16 +144,6 @@ func undermoonScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Tes
 		return err
 	}
 
-	// Test the Redis service
-	err = setKeys(t, publicServiceIP, []string{"e", "f"})
-	if err != nil {
-		return err
-	}
-	err = getKeys(t, publicServiceIP, []string{"a", "b", "c", "d", "e", "f"})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -208,37 +171,4 @@ func UndermoonCluster(t *testing.T) {
 	if err = undermoonScaleTest(t, f, ctx); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func setKeys(t *testing.T, publicServiceIP string, keys []string) error {
-	address := fmt.Sprintf("%s:%d", publicServiceIP, umctrl.ServerProxyPort)
-	client := redis.NewClient(&redis.Options{
-		Addr: address,
-	})
-	for _, key := range keys {
-		value := fmt.Sprintf("%s:value", key)
-		_, err := client.Set(goctx.Background(), key, value, time.Minute*5).Result()
-		if err != nil {
-			return nil
-		}
-	}
-	return nil
-}
-
-func getKeys(t *testing.T, publicServiceIP string, keys []string) error {
-	address := fmt.Sprintf("%s:%d", publicServiceIP, umctrl.ServerProxyPort)
-	client := redis.NewClient(&redis.Options{
-		Addr: address,
-	})
-	for _, key := range keys {
-		v, err := client.Get(goctx.Background(), "a").Result()
-		if err != nil {
-			return nil
-		}
-		expectedValue := fmt.Sprintf("%s:value", key)
-		if v != expectedValue {
-			return errors.Errorf("value not equal: %s != %s", v, expectedValue)
-		}
-	}
-	return nil
 }
