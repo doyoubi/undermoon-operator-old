@@ -9,7 +9,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const serverProxyPort = 5299
+// ServerProxyPort is the port for clients to connect to.
+const ServerProxyPort = 5299
 const redisPort1 = 7001
 const redisPort2 = 7002
 const serverProxyContainerName = "server-proxy"
@@ -39,7 +40,7 @@ func createStorageService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 			Ports: []corev1.ServicePort{
 				{
 					Name:     "server-proxy-port",
-					Port:     serverProxyPort,
+					Port:     ServerProxyPort,
 					Protocol: corev1.ProtocolTCP,
 				},
 			},
@@ -74,7 +75,7 @@ func createStoragePublicService(cr *undermoonv1alpha1.Undermoon) *corev1.Service
 			Ports: []corev1.ServicePort{
 				{
 					Name:     "server-proxy-public-port",
-					Port:     serverProxyPort,
+					Port:     ServerProxyPort,
 					Protocol: corev1.ProtocolTCP,
 				},
 			},
@@ -108,7 +109,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 		},
 		{
 			Name:  "UNDERMOON_ADDRESS",
-			Value: fmt.Sprintf("0.0.0.0:%d", serverProxyPort),
+			Value: fmt.Sprintf("0.0.0.0:%d", ServerProxyPort),
 		},
 		// UNDERMOON_ANNOUNCE_ADDRESS is set in the command
 		{
@@ -163,7 +164,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 		Command: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("UNDERMOON_ANNOUNCE_ADDRESS=\"%s:%d\" server_proxy", podIPEnvStr, serverProxyPort),
+			fmt.Sprintf("UNDERMOON_ANNOUNCE_ADDRESS=\"%s:%d\" server_proxy", podIPEnvStr, ServerProxyPort),
 		},
 		Env: env,
 	}
@@ -267,7 +268,7 @@ func genStorageFQDNFromName(name string, cr *undermoonv1alpha1.Undermoon) string
 
 func genStorageAddressFromName(name string, cr *undermoonv1alpha1.Undermoon) string {
 	host := genStorageFQDNFromName(name, cr)
-	addr := fmt.Sprintf("%s:%d", host, serverProxyPort)
+	addr := fmt.Sprintf("%s:%d", host, ServerProxyPort)
 	return addr
 }
 

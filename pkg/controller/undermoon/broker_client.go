@@ -126,7 +126,7 @@ type serverProxyMeta struct {
 
 func newServerProxyMeta(podHost, nodeIP string, index int) serverProxyMeta {
 	return serverProxyMeta{
-		ProxyAddress: fmt.Sprintf("%s:%d", podHost, serverProxyPort),
+		ProxyAddress: fmt.Sprintf("%s:%d", podHost, ServerProxyPort),
 		RedisAddresses: [2]string{
 			fmt.Sprintf("%s:%d", podHost, redisPort1),
 			fmt.Sprintf("%s:%d", podHost, redisPort2),

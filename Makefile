@@ -1,6 +1,7 @@
 lint:
 	go fmt $(shell go list ./...)
 	golint ./pkg/controller...
+	golint ./test/e2e...
 
 update-types:
 	operator-sdk generate k8s
@@ -53,6 +54,13 @@ run-jq-curl:
 
 run-redis-cli:
 	kubectl run -i --tty --rm debug-redis-cli --image=redis --restart=Never -- sh
+
+e2e-test:
+	kubectl create namespace e2etest || true
+	operator-sdk test local --debug --operator-namespace e2etest ./test/e2e --go-test-flags "-v"
+
+cleanup-e2e-test:
+	kubectl delete namespace e2etest || true
 
 .PHONY: build test lint update-types minikube-env debug-run debug-start debug-stop
 
