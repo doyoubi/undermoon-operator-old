@@ -23,13 +23,17 @@ type UndermoonSpec struct {
 	// max_memory for each Redis instance in MBs.
 	// +kubebuilder:validation:Minimum=1
 	MaxMemory uint32 `json:"maxMemory"`
+	// Port for the redis service.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	Port uint32 `json:"port"`
+	// Enable this to let the shards redirect the requests themselves so that the client does not need to support cluster mode.
+	ActiveRedirection bool `json:"activeRedirection"`
 	// +kubebuilder:validation:MinLength=1
 	UndermoonImage           string            `json:"undermoonImage"`
 	UndermoonImagePullPolicy corev1.PullPolicy `json:"undermoonImagePullPolicy"`
 	// +kubebuilder:validation:MinLength=1
 	RedisImage string `json:"redisImage"`
-	// Enable this to let the shards redirect the requests themselves so that the client does not need to support cluster mode.
-	ActiveRedirection bool `json:"activeRedirection"`
 }
 
 // UndermoonStatus defines the observed state of Undermoon

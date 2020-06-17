@@ -207,7 +207,7 @@ func (con *storageController) getServerProxies(reqLogger logr.Logger, storageSer
 			reqLogger.Error(err, "failed to parse storage hostname", "Name", cr.ObjectMeta.Name, "ClusterName", cr.Spec.ClusterName)
 		}
 		address := genStorageFQDNFromName(hostname, cr)
-		proxy := newServerProxyMeta(address, address, int(index))
+		proxy := newServerProxyMeta(address, address, cr.Spec.Port, int(index))
 		proxies = append(proxies, proxy)
 	}
 

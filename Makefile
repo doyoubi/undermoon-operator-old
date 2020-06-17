@@ -1,11 +1,40 @@
+build:
+	helm package helm/undermoon-operator
+	helm package helm/undermoon-cluster
+
+OPERATOR_HELM_VERSION="0.1.0"
+
+install-helm-package:
+	helm install example-operator "undermoon-operator-$(OPERATOR_HELM_VERSION).tgz"
+	helm install example-undermoon "undermoon-cluster-$(OPERATOR_HELM_VERSION).tgz"
+
+uninstall-helm-package:
+	helm uninstall example-undermoon || true
+	helm uninstall example-operator || true
+
 lint:
 	go fmt $(shell go list ./...)
 	golint ./pkg/controller...
 	golint ./test/e2e...
+	# Helm Charts development:
+	helm lint helm/undermoon-operator --strict
+	helm lint helm/undermoon-cluster --strict
+
+HELM_CHARTS_CRD_FILE=helm/undermoon-operator/templates/undermoon.operator.api_undermoons_crd.yaml
+HELM_CHARTS_RBAC_FILE=helm/undermoon-operator/templates/operator-rbac.yaml
 
 update-types:
 	operator-sdk generate k8s
 	operator-sdk generate crds
+	# Update crd file in Helm Charts
+	echo '# DO NOT MODIFY! This file is copied from deploy/crds/undermoon.operator.api_undermoons_crd.yaml' > $(HELM_CHARTS_CRD_FILE)
+	cat deploy/crds/undermoon.operator.api_undermoons_crd.yaml >> $(HELM_CHARTS_CRD_FILE)
+	echo '# DO NOT MODIFY! This file is generated from several files in deploy/' > $(HELM_CHARTS_RBAC_FILE)
+	cat deploy/service_account.yaml >> $(HELM_CHARTS_RBAC_FILE)
+	echo '---' >> $(HELM_CHARTS_RBAC_FILE)
+	cat deploy/role.yaml >> $(HELM_CHARTS_RBAC_FILE)
+	echo '---' >> $(HELM_CHARTS_RBAC_FILE)
+	cat deploy/role_binding.yaml >> $(HELM_CHARTS_RBAC_FILE)
 
 kind-env:
 	# Run kind with image registry instead of:

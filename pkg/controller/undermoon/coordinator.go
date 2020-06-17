@@ -45,7 +45,7 @@ func createCoordinatorService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 
 // CoordinatorServiceName defines the service for coordinator statefulsets.
 func CoordinatorServiceName(clusterName string) string {
-	return fmt.Sprintf("%s-coordinator-svc", clusterName)
+	return fmt.Sprintf("%s-cd-svc", clusterName)
 }
 
 func createCoordinatorStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSet {
@@ -121,7 +121,7 @@ func createCoordinatorStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.State
 
 // CoordinatorStatefulSetName defines the statefulset for coordinator.
 func CoordinatorStatefulSetName(undermoonName string) string {
-	return fmt.Sprintf("%s-coordinator-ss", undermoonName)
+	return fmt.Sprintf("%s-cd-ss", undermoonName)
 }
 
 func genCoordinatorNames(clusterName string) []string {

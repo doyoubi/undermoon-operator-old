@@ -1,0 +1,13 @@
+apiVersion: undermoon.operator.api/v1alpha1
+kind: Undermoon
+metadata:
+  name: {{ include "undermoon-cluster.fullname" . }}
+spec:
+  clusterName: "{{ .Values.cluster.clusterName }}"
+  chunkNumber: {{ .Values.cluster.chunkNumber }}
+  maxMemory: {{ .Values.cluster.maxMemory }}
+  port: {{ .Values.cluster.port }}
+  activeRedirection: {{ .Values.cluster.activeRedirection }}
+  undermoonImage: "{{ .Values.image.undermoonImage }}"
+  undermoonImagePullPolicy: "{{ .Values.image.undermoonImagePullPolicy }}"
+  redisImage: "{{ .Values.image.redisImage }}"

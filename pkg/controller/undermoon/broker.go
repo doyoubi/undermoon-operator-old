@@ -45,7 +45,7 @@ func createBrokerService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 
 // BrokerServiceName defines the service for broker statefulsets.
 func BrokerServiceName(clusterName string) string {
-	return fmt.Sprintf("%s-broker-svc", clusterName)
+	return fmt.Sprintf("%s-bk-svc", clusterName)
 }
 
 func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSet {
@@ -149,7 +149,7 @@ func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSe
 
 // BrokerStatefulSetName defines the statefulset for memory broker.
 func BrokerStatefulSetName(undermoonName string) string {
-	return fmt.Sprintf("%s-broker-ss", undermoonName)
+	return fmt.Sprintf("%s-bk-ss", undermoonName)
 }
 
 func genBrokerNames(clusterName string) []string {

@@ -6,7 +6,7 @@ spec:
   clusterName: example-cluster
   chunkNumber: 1
   maxMemory: 32  # in MBs
+  activeRedirection: false
   undermoonImage: localhost:5000/undermoon_test
   undermoonImagePullPolicy: IfNotPresent
   redisImage: redis:5.0.9
-  activeRedirection: false

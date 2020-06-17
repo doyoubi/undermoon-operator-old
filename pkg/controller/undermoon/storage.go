@@ -10,8 +10,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ServerProxyPort is the port for clients to connect to.
-const ServerProxyPort = 5299
+// DefaultServerProxyPort is the port for clients to connect to.
+const DefaultServerProxyPort = 5299
 const redisPort1 = 7001
 const redisPort2 = 7002
 const serverProxyContainerName = "server-proxy"
@@ -41,7 +41,7 @@ func createStorageService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 			Ports: []corev1.ServicePort{
 				{
 					Name:     "server-proxy-port",
-					Port:     ServerProxyPort,
+					Port:     int32(cr.Spec.Port),
 					Protocol: corev1.ProtocolTCP,
 				},
 			},
@@ -76,7 +76,7 @@ func createStoragePublicService(cr *undermoonv1alpha1.Undermoon) *corev1.Service
 			Ports: []corev1.ServicePort{
 				{
 					Name:     "server-proxy-public-port",
-					Port:     ServerProxyPort,
+					Port:     int32(cr.Spec.Port),
 					Protocol: corev1.ProtocolTCP,
 				},
 			},
@@ -87,12 +87,12 @@ func createStoragePublicService(cr *undermoonv1alpha1.Undermoon) *corev1.Service
 
 // StorageServiceName defines the service for storage StatefulSet.
 func StorageServiceName(clusterName string) string {
-	return fmt.Sprintf("%s-storage-svc", clusterName)
+	return fmt.Sprintf("%s-stg-svc", clusterName)
 }
 
 // StoragePublicServiceName defines the service for storage StatefulSet.
 func StoragePublicServiceName(clusterName string) string {
-	return fmt.Sprintf("%s-storage-public-svc", clusterName)
+	return clusterName
 }
 
 func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSet {
@@ -110,7 +110,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 		},
 		{
 			Name:  "UNDERMOON_ADDRESS",
-			Value: fmt.Sprintf("0.0.0.0:%d", ServerProxyPort),
+			Value: fmt.Sprintf("0.0.0.0:%d", cr.Spec.Port),
 		},
 		// UNDERMOON_ANNOUNCE_ADDRESS is set in the command
 		{
@@ -165,7 +165,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 		Command: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("UNDERMOON_ANNOUNCE_ADDRESS=\"%s:%d\" server_proxy", podIPEnvStr, ServerProxyPort),
+			fmt.Sprintf("UNDERMOON_ANNOUNCE_ADDRESS=\"%s:%d\" server_proxy", podIPEnvStr, cr.Spec.Port),
 		},
 		Env: env,
 	}
@@ -178,7 +178,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 			Exec: &corev1.ExecAction{
 				// Checks whether the server proxy has received UMCTL SETCLUSTER.
 				Command: []string{
-					"sh", "-c", "[ '' != \"$(redis-cli -p 5299 CLUSTER NODES)\" ]",
+					"sh", "-c", fmt.Sprintf("[ '' != \"$(redis-cli -p %d CLUSTER NODES)\" ]", cr.Spec.Port),
 				},
 			},
 		},
@@ -245,7 +245,7 @@ func genRedisContainer(index uint32, redisImage string, maxMemory, port uint32) 
 
 // StorageStatefulSetName defines the StatefulSet for server proxy.
 func StorageStatefulSetName(undermoonName string) string {
-	return fmt.Sprintf("%s-storage-ss", undermoonName)
+	return fmt.Sprintf("%s-stg-ss", undermoonName)
 }
 
 func genStorageNames(clusterName string, replicas int) []string {
@@ -269,7 +269,7 @@ func genStorageFQDNFromName(name string, cr *undermoonv1alpha1.Undermoon) string
 
 func genStorageAddressFromName(name string, cr *undermoonv1alpha1.Undermoon) string {
 	host := genStorageFQDNFromName(name, cr)
-	addr := fmt.Sprintf("%s:%d", host, ServerProxyPort)
+	addr := fmt.Sprintf("%s:%d", host, cr.Spec.Port)
 	return addr
 }
 
