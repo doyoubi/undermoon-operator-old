@@ -44,8 +44,8 @@ func createBrokerService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 }
 
 // BrokerServiceName defines the service for broker statefulsets.
-func BrokerServiceName(clusterName string) string {
-	return fmt.Sprintf("%s-bk-svc", clusterName)
+func BrokerServiceName(undermoonName string) string {
+	return fmt.Sprintf("%s-bk-svc", undermoonName)
 }
 
 func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSet {
@@ -152,18 +152,18 @@ func BrokerStatefulSetName(undermoonName string) string {
 	return fmt.Sprintf("%s-bk-ss", undermoonName)
 }
 
-func genBrokerNames(clusterName string) []string {
+func genBrokerNames(undermoonName string) []string {
 	names := []string{}
 	for i := int32(0); i != brokerNum; i++ {
-		name := fmt.Sprintf("%s-%d", BrokerStatefulSetName(clusterName), i)
+		name := fmt.Sprintf("%s-%d", BrokerStatefulSetName(undermoonName), i)
 		names = append(names, name)
 	}
 	return names
 }
 
-func genBrokerFQDN(brokerName, clusterName, namespace string) string {
+func genBrokerFQDN(podName, undermoonName, namespace string) string {
 	// pod-specific-string.serviceName.default.svc.cluster.local
-	return fmt.Sprintf("%s.%s.%s.svc.cluster.local", brokerName, BrokerServiceName(clusterName), namespace)
+	return fmt.Sprintf("%s.%s.%s.svc.cluster.local", podName, BrokerServiceName(undermoonName), namespace)
 }
 
 func genBrokerStatefulSetAddrs(cr *undermoonv1alpha1.Undermoon) []string {

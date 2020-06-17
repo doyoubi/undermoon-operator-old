@@ -86,13 +86,13 @@ func createStoragePublicService(cr *undermoonv1alpha1.Undermoon) *corev1.Service
 }
 
 // StorageServiceName defines the service for storage StatefulSet.
-func StorageServiceName(clusterName string) string {
-	return fmt.Sprintf("%s-stg-svc", clusterName)
+func StorageServiceName(undermoonName string) string {
+	return fmt.Sprintf("%s-stg-svc", undermoonName)
 }
 
 // StoragePublicServiceName defines the service for storage StatefulSet.
-func StoragePublicServiceName(clusterName string) string {
-	return clusterName
+func StoragePublicServiceName(undermoonName string) string {
+	return undermoonName
 }
 
 func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSet {
@@ -103,7 +103,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 	}
 
 	env := []corev1.EnvVar{
-		podIPEnv(),
+		podNameEnv(),
 		{
 			Name:  "RUST_LOG",
 			Value: "undermoon=info,server_proxy=info",
@@ -158,6 +158,8 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 			Value: strconv.FormatBool(cr.Spec.ActiveRedirection),
 		},
 	}
+
+	fqdn := genStorageFQDNFromName(podNameStr, cr)
 	serverProxyContainer := corev1.Container{
 		Name:            serverProxyContainerName,
 		Image:           cr.Spec.UndermoonImage,
@@ -165,7 +167,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 		Command: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("UNDERMOON_ANNOUNCE_ADDRESS=\"%s:%d\" server_proxy", podIPEnvStr, cr.Spec.Port),
+			fmt.Sprintf("UNDERMOON_ANNOUNCE_ADDRESS=\"%s:%d\" server_proxy", fqdn, cr.Spec.Port),
 		},
 		Env: env,
 	}
@@ -248,18 +250,18 @@ func StorageStatefulSetName(undermoonName string) string {
 	return fmt.Sprintf("%s-stg-ss", undermoonName)
 }
 
-func genStorageNames(clusterName string, replicas int) []string {
+func genStorageNames(undermoonName string, replicas int) []string {
 	names := []string{}
 	for i := 0; i != replicas; i++ {
-		name := fmt.Sprintf("%s-%d", StorageStatefulSetName(clusterName), i)
+		name := fmt.Sprintf("%s-%d", StorageStatefulSetName(undermoonName), i)
 		names = append(names, name)
 	}
 	return names
 }
 
-func genStorageFQDN(storageName, clusterName, namespace string) string {
+func genStorageFQDN(podName, undermoonName, namespace string) string {
 	// pod-specific-string.serviceName.default.svc.cluster.local
-	return fmt.Sprintf("%s.%s.%s.svc.cluster.local", storageName, StorageServiceName(clusterName), namespace)
+	return fmt.Sprintf("%s.%s.%s.svc.cluster.local", podName, StorageServiceName(undermoonName), namespace)
 }
 
 func genStorageFQDNFromName(name string, cr *undermoonv1alpha1.Undermoon) string {

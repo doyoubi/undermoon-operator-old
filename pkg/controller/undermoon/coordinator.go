@@ -44,8 +44,8 @@ func createCoordinatorService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 }
 
 // CoordinatorServiceName defines the service for coordinator statefulsets.
-func CoordinatorServiceName(clusterName string) string {
-	return fmt.Sprintf("%s-cd-svc", clusterName)
+func CoordinatorServiceName(undermoonName string) string {
+	return fmt.Sprintf("%s-cd-svc", undermoonName)
 }
 
 func createCoordinatorStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSet {
@@ -124,18 +124,18 @@ func CoordinatorStatefulSetName(undermoonName string) string {
 	return fmt.Sprintf("%s-cd-ss", undermoonName)
 }
 
-func genCoordinatorNames(clusterName string) []string {
+func genCoordinatorNames(undermoonName string) []string {
 	names := []string{}
 	for i := int32(0); i != coordinatorNum; i++ {
-		name := fmt.Sprintf("%s-%d", CoordinatorStatefulSetName(clusterName), i)
+		name := fmt.Sprintf("%s-%d", CoordinatorStatefulSetName(undermoonName), i)
 		names = append(names, name)
 	}
 	return names
 }
 
-func genCoordinatorFQDN(coordinatorName, clusterName, namespace string) string {
+func genCoordinatorFQDN(podName, undermoonName, namespace string) string {
 	// pod-specific-string.serviceName.default.svc.cluster.local
-	return fmt.Sprintf("%s.%s.%s.svc.cluster.local", coordinatorName, CoordinatorServiceName(clusterName), namespace)
+	return fmt.Sprintf("%s.%s.%s.svc.cluster.local", podName, CoordinatorServiceName(undermoonName), namespace)
 }
 
 func genCoordinatorStatefulSetAddrs(cr *undermoonv1alpha1.Undermoon) []string {

@@ -71,6 +71,7 @@ func getEndpoints(client client.Client, serviceName, namespace string) ([]corev1
 }
 
 const podIPEnvStr = "$(UM_POD_IP)"
+const podNameStr = "$(UM_POD_NAME)"
 
 func podIPEnv() corev1.EnvVar {
 	return corev1.EnvVar{
@@ -78,6 +79,17 @@ func podIPEnv() corev1.EnvVar {
 		ValueFrom: &corev1.EnvVarSource{
 			FieldRef: &corev1.ObjectFieldSelector{
 				FieldPath: "status.podIP",
+			},
+		},
+	}
+}
+
+func podNameEnv() corev1.EnvVar {
+	return corev1.EnvVar{
+		Name: "UM_POD_NAME",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: "metadata.name",
 			},
 		},
 	}
