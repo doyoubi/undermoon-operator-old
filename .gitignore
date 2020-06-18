@@ -78,3 +78,7 @@ tags
 
 # Helm package
 *.tgz
+
+# Chaotest
+chaostest/__pycache__
+
