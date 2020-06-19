@@ -23,10 +23,7 @@ class AioRedisClusterClient:
         return self.client_map[address]
 
     async def get(self, key):
-        return await self.exec(lambda client: self.get_helper(client, key))
-
-    def get_helper(self, client, key):
-        return client.get(key, encoding='utf-8')
+        return await self.exec(lambda client: client.get(key, encoding='utf-8'))
 
     async def set(self, key, value):
         return await self.exec(lambda client: client.set(key, value))
@@ -35,7 +32,7 @@ class AioRedisClusterClient:
         return await self.exec(lambda client: client.delete(key, *keys))
 
     async def mget(self, key, *keys):
-        return await self.exec(lambda client: client.mget(key, *keys))
+        return await self.exec(lambda client: client.mget(key, *keys, encoding='utf-8'))
 
     async def mset(self, *kvs):
         return await self.exec(lambda client: client.mset(*kvs))

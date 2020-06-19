@@ -82,3 +82,6 @@ tags
 # Chaotest
 chaostest/__pycache__
 
+# vscode
+report.xml
+

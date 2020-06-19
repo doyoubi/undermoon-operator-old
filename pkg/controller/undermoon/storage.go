@@ -184,7 +184,9 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 				},
 			},
 		},
-		PeriodSeconds: 3,
+		PeriodSeconds:    1,
+		SuccessThreshold: 3,
+		FailureThreshold: 1,
 	}
 
 	podSpec := corev1.PodTemplateSpec{

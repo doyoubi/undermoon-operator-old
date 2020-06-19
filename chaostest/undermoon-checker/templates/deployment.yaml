@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "undermoon-checker.fullname" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: {{ include "undermoon-checker.fullname" . }}
+  template:
+    metadata:
+      labels:
+        name: {{ include "undermoon-checker.fullname" . }}
+    spec:
+      containers:
+        - name: {{ include "undermoon-checker.name" . }}
+          image: "{{ .Values.image.checkerImage }}"
+          imagePullPolicy: {{ .Values.image.checkerImagePullPolicy }}
+          command:
+          - sleep
+          - "10000000"
+          # - python
+          # - check_service.py
+          # - "{{ .Values.undermoonServiceAddress }}"
