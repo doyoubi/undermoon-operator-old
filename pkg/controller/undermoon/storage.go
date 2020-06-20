@@ -174,18 +174,25 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 	redisContainer1 := genRedisContainer(1, cr.Spec.RedisImage, cr.Spec.MaxMemory, redisPort1)
 	redisContainer2 := genRedisContainer(2, cr.Spec.RedisImage, cr.Spec.MaxMemory, redisPort2)
 
-	// Use the redis-cli in redis container
-	redisContainer1.ReadinessProbe = &corev1.Probe{
+	checkCmd := []string{
+		"bash",
+		"-c",
+		// Checks whether the server proxy has received UMCTL SETCLUSTER.
+		// Send UMCTL READY to server proxy and
+		// see whether it returns `:1\r\n`.
+		fmt.Sprintf(
+			"[ \"$(exec 5<>/dev/tcp/localhost/%d; printf '*2\r\n$5\r\nUMCTL\r\n$5\r\nREADY\r\n' >&5; head -c 2 <&5)\" == ':1' ]",
+			cr.Spec.Port,
+		),
+	}
+	serverProxyContainer.ReadinessProbe = &corev1.Probe{
 		Handler: corev1.Handler{
 			Exec: &corev1.ExecAction{
-				// Checks whether the server proxy has received UMCTL SETCLUSTER.
-				Command: []string{
-					"sh", "-c", fmt.Sprintf("[ '' != \"$(redis-cli -p %d CLUSTER NODES)\" ]", cr.Spec.Port),
-				},
+				Command: checkCmd,
 			},
 		},
 		PeriodSeconds:    1,
-		SuccessThreshold: 3,
+		SuccessThreshold: 1,
 		FailureThreshold: 1,
 	}
 

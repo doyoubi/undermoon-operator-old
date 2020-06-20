@@ -6,6 +6,8 @@ OPERATOR_HELM_VERSION="0.1.0"
 CHECKER_HELM_VERSION="0.1.0"
 
 install-helm-package:
+	helm package helm/undermoon-operator
+	helm package helm/undermoon-cluster
 	helm install example-operator "undermoon-operator-$(OPERATOR_HELM_VERSION).tgz"
 	helm install example-undermoon "undermoon-cluster-$(OPERATOR_HELM_VERSION).tgz"
 
@@ -84,7 +86,7 @@ run-jq-curl:
 	kubectl run -i --tty --rm debug-jq-curl --image=dwdraju/alpine-curl-jq --restart=Never -- sh
 
 run-redis-cli:
-	kubectl run -i --tty --rm debug-redis-cli --image=redis --restart=Never -- sh
+	kubectl run -i --tty --rm debug-redis-cli --image=redis --restart=Never -- bash
 
 e2e-test:
 	kubectl create namespace e2etest || true

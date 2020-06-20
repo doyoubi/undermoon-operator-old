@@ -17,8 +17,9 @@ spec:
           image: "{{ .Values.image.checkerImage }}"
           imagePullPolicy: {{ .Values.image.checkerImagePullPolicy }}
           command:
-          - sleep
-          - "10000000"
-          # - python
-          # - check_service.py
-          # - "{{ .Values.undermoonServiceAddress }}"
+          - python
+          - check_service.py
+          - "{{ .Values.undermoonServiceAddress }}"
+          # For debugging
+          # - sleep
+          # - "10000000"

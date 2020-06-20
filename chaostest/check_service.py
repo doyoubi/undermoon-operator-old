@@ -15,7 +15,7 @@ MAX_SLOT = 16384
 
 
 class KeyValueChecker:
-    MAX_KVS = 100
+    MAX_KVS = 2000
 
     def __init__(self, checker_name, client):
         self.checker_name = checker_name
@@ -187,6 +187,7 @@ class RandomChecker:
 
     async def run_one_checker(self, checker_name):
         client = AioRedisClusterClient(self.startup_nodes, timeout=1)
+        await client.init_pool()
         while True:
             checker = KeyValueChecker(checker_name, client)
             await checker.loop_check()
@@ -207,7 +208,14 @@ def group_by_slot(keys):
 
 
 async def main(startup_nodes):
-    await RandomChecker(startup_nodes, 1).run()
+    try:
+        await RandomChecker(startup_nodes, 10).run()
+    except Exception as e:
+        logger.error('checker stopped', e)
+
+    logger.info('checker stopped but it will keep running so that we can see the logs')
+    while True:
+        await asyncio.sleep(3600)
 
 
 if __name__ == '__main__':
