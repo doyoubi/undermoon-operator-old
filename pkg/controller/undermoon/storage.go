@@ -102,6 +102,13 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 		"undermoonClusterName": cr.Spec.ClusterName,
 	}
 
+	// Use the first proxy address instead of the service address
+	// for the default redirection address when scaling down
+	// because using service address can result in too many
+	// redirections if the majority pods are removed
+	// at the same time.
+	firstProxyAddress := genStorageAddressFromName(storageStatefulSetPodName(cr.ObjectMeta.Name, 0), cr)
+
 	env := []corev1.EnvVar{
 		podNameEnv(),
 		{
@@ -156,6 +163,10 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 		{
 			Name:  "UNDERMOON_ACTIVE_REDIRECTION",
 			Value: strconv.FormatBool(cr.Spec.ActiveRedirection),
+		},
+		{
+			Name:  "UNDERMOON_DEFAULT_REDIRECTION_ADDRESS",
+			Value: firstProxyAddress,
 		},
 	}
 
@@ -259,10 +270,14 @@ func StorageStatefulSetName(undermoonName string) string {
 	return fmt.Sprintf("%s-stg-ss", undermoonName)
 }
 
+func storageStatefulSetPodName(undermoonName string, index int) string {
+	return fmt.Sprintf("%s-%d", StorageStatefulSetName(undermoonName), index)
+}
+
 func genStorageNames(undermoonName string, replicas int) []string {
 	names := []string{}
 	for i := 0; i != replicas; i++ {
-		name := fmt.Sprintf("%s-%d", StorageStatefulSetName(undermoonName), i)
+		name := storageStatefulSetPodName(undermoonName, i)
 		names = append(names, name)
 	}
 	return names

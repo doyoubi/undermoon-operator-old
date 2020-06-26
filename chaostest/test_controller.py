@@ -17,7 +17,7 @@ async def keep_randomly_scaling(undermoon_cluster_name):
         chunk_number = random.randint(1, 8)
         await randomly_scale(undermoon_cluster_name, chunk_number)
 
-        sleep_time = int(abs(random.gauss(0, 60) + 300))
+        sleep_time = int(abs(random.gauss(0, 60) + 40))
         await asyncio.sleep(sleep_time)
 
 

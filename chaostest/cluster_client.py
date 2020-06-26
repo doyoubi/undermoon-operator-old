@@ -46,7 +46,10 @@ class AioRedisClusterClient:
         # (2) importing node (PreSwitched not done)
         # (3) migrating node (PreSwitched done this time)
         # (4) importing node again!
-        RETRY_TIMES = 4
+        # Also, when scaling down the deleted node
+        # will redirect to the cluster
+        # so it needs another additional redirection.
+        RETRY_TIMES = 5
         tried_addressess = [address]
         for i in range(0, RETRY_TIMES):
             try:
@@ -57,7 +60,9 @@ class AioRedisClusterClient:
                 if i == RETRY_TIMES - 1:
                     logger.error("exceed max redirection times: {}", tried_addressess)
                     raise Exception("{}: {}".format(address, e))
+                former_address = address
                 address = self.parse_moved(str(e))
+                logger.debug('moved {} -> {}', former_address, address)
                 client = await self.get_or_create_client(address)
                 tried_addressess.append(address)
 

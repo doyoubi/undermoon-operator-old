@@ -80,6 +80,10 @@ func createCoordinatorStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.State
 			Name:  "UNDERMOON_THREAD_NUMBER",
 			Value: "2",
 		},
+		{
+			Name:  "UNDERMOON_PROXY_TIMEOUT",
+			Value: "3",
+		},
 	}
 	container := corev1.Container{
 		Name:            coordinatorContainerName,
