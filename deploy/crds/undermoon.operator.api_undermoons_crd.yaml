@@ -35,7 +35,7 @@ spec:
               description: Enable this to let the shards redirect the requests themselves
                 so that the client does not need to support cluster mode.
               type: boolean
-            brokerResource:
+            brokerResources:
               description: ResourceRequirements describes the compute resource requirements.
               properties:
                 limits:
@@ -71,7 +71,7 @@ spec:
               maxLength: 30
               minLength: 1
               type: string
-            coordinatorResource:
+            coordinatorResources:
               description: ResourceRequirements describes the compute resource requirements.
               properties:
                 limits:
@@ -108,7 +108,7 @@ spec:
               maximum: 65535
               minimum: 1
               type: integer
-            proxyResource:
+            proxyResources:
               description: ResourceRequirements describes the compute resource requirements.
               properties:
                 limits:
@@ -141,7 +141,7 @@ spec:
             redisImage:
               minLength: 1
               type: string
-            reidsResource:
+            redisResources:
               description: ResourceRequirements describes the compute resource requirements.
               properties:
                 limits:

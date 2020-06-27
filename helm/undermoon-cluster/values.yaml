@@ -12,8 +12,26 @@ cluster:
 
 image:
   undermoonImage: localhost:5000/undermoon_test
-  undermoonImagePullPolicy: IfNotPresent
+  undermoonImagePullPolicy: Always # IfNotPresent
   redisImage: redis:5.0.9
+
+resources:
+  brokerResources:
+    limits:
+      {}
+      # cpu: "0.05"
+  coordinatorResources:
+    limits:
+      {}
+      # cpu: "0.05"
+  proxyResources:
+    limits:
+      {}
+      # cpu: "0.05"
+  redisResources:
+    limits:
+      {}
+      # cpu: "0.05"
 
 nameOverride: ""
 fullnameOverride: ""

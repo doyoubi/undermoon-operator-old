@@ -39,13 +39,13 @@ type UndermoonSpec struct {
 	RedisImage string `json:"redisImage"`
 
 	// +optional
-	BrokerResource corev1.ResourceRequirements `json:"brokerResource"`
+	BrokerResources corev1.ResourceRequirements `json:"brokerResources"`
 	// +optional
-	CoordinatorResource corev1.ResourceRequirements `json:"coordinatorResource"`
+	CoordinatorResources corev1.ResourceRequirements `json:"coordinatorResources"`
 	// +optional
-	ProxyResource corev1.ResourceRequirements `json:"proxyResource"`
+	ProxyResources corev1.ResourceRequirements `json:"proxyResources"`
 	// +optional
-	RedisResource corev1.ResourceRequirements `json:"reidsResource"`
+	RedisResources corev1.ResourceRequirements `json:"redisResources"`
 }
 
 // UndermoonStatus defines the observed state of Undermoon

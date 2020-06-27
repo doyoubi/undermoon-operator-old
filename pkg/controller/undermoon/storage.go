@@ -182,7 +182,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 			fmt.Sprintf("UNDERMOON_ANNOUNCE_ADDRESS=\"%s:%d\" server_proxy", fqdn, cr.Spec.Port),
 		},
 		Env:       env,
-		Resources: cr.Spec.ProxyResource,
+		Resources: cr.Spec.ProxyResources,
 	}
 	redisContainer1 := genRedisContainer(1, cr.Spec.RedisImage, cr.Spec.MaxMemory, redisPort1, cr)
 	redisContainer2 := genRedisContainer(2, cr.Spec.RedisImage, cr.Spec.MaxMemory, redisPort2, cr)
@@ -265,7 +265,7 @@ func genRedisContainer(index uint32, redisImage string, maxMemory, port uint32, 
 			"allkeys-lru",
 		},
 		Env:       []corev1.EnvVar{podIPEnv()},
-		Resources: cr.Spec.RedisResource,
+		Resources: cr.Spec.RedisResources,
 	}
 }
 

@@ -116,7 +116,7 @@ func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSe
 		ImagePullPolicy: cr.Spec.UndermoonImagePullPolicy,
 		Command:         []string{"mem_broker"},
 		Env:             env,
-		Resources:       cr.Spec.BrokerResource,
+		Resources:       cr.Spec.BrokerResources,
 	}
 	podSpec := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{

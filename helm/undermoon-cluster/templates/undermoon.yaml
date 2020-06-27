@@ -12,3 +12,11 @@ spec:
   undermoonImage: "{{ .Values.image.undermoonImage }}"
   undermoonImagePullPolicy: "{{ .Values.image.undermoonImagePullPolicy }}"
   redisImage: "{{ .Values.image.redisImage }}"
+  brokerResources:
+    {{- toYaml .Values.resources.brokerResources | nindent 4 }}
+  coordinatorResources:
+    {{- toYaml .Values.resources.coordinatorResources | nindent 4 }}
+  proxyResources:
+    {{- toYaml .Values.resources.proxyResources | nindent 4 }}
+  redisResources:
+    {{- toYaml .Values.resources.redisResources | nindent 4 }}
