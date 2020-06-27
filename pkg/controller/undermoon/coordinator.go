@@ -13,6 +13,7 @@ const coordinatorPort = 6699
 const coordinatorNum int32 = 3
 const coordinatorContainerName = "coordinator"
 const undermoonServiceTypeCoordinator = "coordinator"
+const coordinatorTopologyKey = "undermoon-broker-topology-key"
 
 func createCoordinatorService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 	undermoonName := cr.ObjectMeta.Name
@@ -98,6 +99,7 @@ func createCoordinatorStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.State
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{container},
+			Affinity:   genAntiAffinity(labels, cr.ObjectMeta.Namespace, coordinatorTopologyKey),
 		},
 	}
 

@@ -10,6 +10,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -120,4 +121,23 @@ func (pool *redisClientPool) getClient(redisAddress string) *redis.Client {
 	})
 	pool.clients[redisAddress] = client
 	return client
+}
+
+func genAntiAffinity(labels map[string]string, namespace, topologyKey string) *corev1.Affinity {
+	return &corev1.Affinity{
+		PodAntiAffinity: &corev1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+				corev1.WeightedPodAffinityTerm{
+					Weight: 2,
+					PodAffinityTerm: corev1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: labels,
+						},
+						Namespaces:  []string{namespace},
+						TopologyKey: topologyKey,
+					},
+				},
+			},
+		},
+	}
 }

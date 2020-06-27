@@ -13,6 +13,7 @@ const brokerPort = 7799
 const brokerNum int32 = 3
 const brokerContainerName = "broker"
 const undermoonServiceTypeBroker = "broker"
+const brokerTopologyKey = "undermoon-broker-topology-key"
 
 func createBrokerService(cr *undermoonv1alpha1.Undermoon) *corev1.Service {
 	undermoonName := cr.ObjectMeta.Name
@@ -122,6 +123,7 @@ func createBrokerStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulSe
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{container},
+			Affinity:   genAntiAffinity(labels, cr.ObjectMeta.Namespace, brokerTopologyKey),
 		},
 	}
 

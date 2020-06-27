@@ -17,6 +17,7 @@ const redisPort2 = 7002
 const serverProxyContainerName = "server-proxy"
 const redisContainerName = "redis"
 const undermoonServiceTypeStorage = "storage"
+const storageTopologyKey = "undermoon-storage-topology-key"
 
 // This service is only used internally for getting the created server proxies
 // which have not received UMCTL SETCLUSTER.
@@ -217,6 +218,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 				redisContainer1,
 				redisContainer2,
 			},
+			Affinity: genAntiAffinity(labels, cr.ObjectMeta.Namespace, storageTopologyKey),
 		},
 	}
 
