@@ -92,6 +92,7 @@ func createCoordinatorStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.State
 		ImagePullPolicy: cr.Spec.UndermoonImagePullPolicy,
 		Command:         []string{"coordinator"},
 		Env:             env,
+		Resources:       cr.Spec.CoordinatorResource,
 	}
 	podSpec := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{

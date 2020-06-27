@@ -56,6 +56,7 @@ func undermoonScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Tes
 			MaxMemory:                10,
 			Port:                     umctrl.DefaultServerProxyPort,
 			ActiveRedirection:        true,
+			ProxyThreads:             2,
 			UndermoonImage:           "localhost:5000/undermoon_test",
 			UndermoonImagePullPolicy: corev1.PullAlways,
 			RedisImage:               "redis:5.0.8",

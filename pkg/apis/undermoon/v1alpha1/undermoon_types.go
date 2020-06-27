@@ -29,11 +29,23 @@ type UndermoonSpec struct {
 	Port uint32 `json:"port"`
 	// Enable this to let the shards redirect the requests themselves so that the client does not need to support cluster mode.
 	ActiveRedirection bool `json:"activeRedirection"`
+	// +kubebuilder:validation:Minimum=1
+	ProxyThreads uint32 `json:"proxyThreads"`
+
 	// +kubebuilder:validation:MinLength=1
 	UndermoonImage           string            `json:"undermoonImage"`
 	UndermoonImagePullPolicy corev1.PullPolicy `json:"undermoonImagePullPolicy"`
 	// +kubebuilder:validation:MinLength=1
 	RedisImage string `json:"redisImage"`
+
+	// +optional
+	BrokerResource corev1.ResourceRequirements `json:"brokerResource"`
+	// +optional
+	CoordinatorResource corev1.ResourceRequirements `json:"coordinatorResource"`
+	// +optional
+	ProxyResource corev1.ResourceRequirements `json:"proxyResource"`
+	// +optional
+	RedisResource corev1.ResourceRequirements `json:"reidsResource"`
 }
 
 // UndermoonStatus defines the observed state of Undermoon

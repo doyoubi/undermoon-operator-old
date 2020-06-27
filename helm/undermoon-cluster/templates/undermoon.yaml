@@ -8,6 +8,7 @@ spec:
   maxMemory: {{ .Values.cluster.maxMemory }}
   port: {{ .Values.cluster.port }}
   activeRedirection: {{ .Values.cluster.activeRedirection }}
+  proxyThreads: {{ .Values.cluster.proxyThreads }}
   undermoonImage: "{{ .Values.image.undermoonImage }}"
   undermoonImagePullPolicy: "{{ .Values.image.undermoonImagePullPolicy }}"
   redisImage: "{{ .Values.image.redisImage }}"

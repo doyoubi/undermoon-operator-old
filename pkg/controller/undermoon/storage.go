@@ -181,10 +181,11 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 			"-c",
 			fmt.Sprintf("UNDERMOON_ANNOUNCE_ADDRESS=\"%s:%d\" server_proxy", fqdn, cr.Spec.Port),
 		},
-		Env: env,
+		Env:       env,
+		Resources: cr.Spec.ProxyResource,
 	}
-	redisContainer1 := genRedisContainer(1, cr.Spec.RedisImage, cr.Spec.MaxMemory, redisPort1)
-	redisContainer2 := genRedisContainer(2, cr.Spec.RedisImage, cr.Spec.MaxMemory, redisPort2)
+	redisContainer1 := genRedisContainer(1, cr.Spec.RedisImage, cr.Spec.MaxMemory, redisPort1, cr)
+	redisContainer2 := genRedisContainer(2, cr.Spec.RedisImage, cr.Spec.MaxMemory, redisPort2, cr)
 
 	checkCmd := []string{
 		"bash",
@@ -244,7 +245,7 @@ func createStorageStatefulSet(cr *undermoonv1alpha1.Undermoon) *appsv1.StatefulS
 	}
 }
 
-func genRedisContainer(index uint32, redisImage string, maxMemory, port uint32) corev1.Container {
+func genRedisContainer(index uint32, redisImage string, maxMemory, port uint32, cr *undermoonv1alpha1.Undermoon) corev1.Container {
 	portStr := fmt.Sprintf("%d", port)
 	return corev1.Container{
 		Name:            fmt.Sprintf("%s-%d", redisContainerName, index),
@@ -263,7 +264,8 @@ func genRedisContainer(index uint32, redisImage string, maxMemory, port uint32) 
 			"--maxmemory-policy",
 			"allkeys-lru",
 		},
-		Env: []corev1.EnvVar{podIPEnv()},
+		Env:       []corev1.EnvVar{podIPEnv()},
+		Resources: cr.Spec.RedisResource,
 	}
 }
 
