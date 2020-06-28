@@ -1,7 +1,9 @@
 build:
+	operator-sdk build undermoon-operator:$(OPERATOR_VERSION)
 	helm package helm/undermoon-operator
 	helm package helm/undermoon-cluster
 
+OPERATOR_VERSION="v0.0.1"
 OPERATOR_HELM_VERSION="0.1.0"
 CHECKER_HELM_VERSION="0.1.0"
 
@@ -51,8 +53,8 @@ list-images:
 	curl http://localhost:5000/v2/_catalog
 
 debug-build:
-	operator-sdk build localhost:5000/undermoon-operator:v0.0.1
-	docker push localhost:5000/undermoon-operator:v0.0.1
+	operator-sdk build localhost:5000/undermoon-operator:$(OPERATOR_VERSION)
+	docker push localhost:5000/undermoon-operator:$(OPERATOR_VERSION)
 
 debug-run:
 	kubectl create -f deploy/crds/undermoon.operator.api_undermoons_crd.yaml
@@ -95,7 +97,7 @@ e2e-test:
 cleanup-e2e-test:
 	kubectl delete namespace e2etest || true
 
-docker-build-test-image:
+docker-build-checker-image:
 	docker image build -f chaostest/Dockerfile -t undermoon_checker .
 	docker tag undermoon_checker localhost:5000/undermoon_checker
 	docker push localhost:5000/undermoon_checker
@@ -106,6 +108,9 @@ install-undermoon-checker:
 
 uninstall-undermoon-checker:
 	helm uninstall example-checker
+
+checker-logs:
+	./scripts/checker_logs.sh
 
 .PHONY: build test lint update-types minikube-env debug-run debug-start debug-stop
 
