@@ -6,6 +6,7 @@ spec:
   clusterName: example-cluster
   chunkNumber: 1
   maxMemory: 32  # in MBs
+  port: 5299
   activeRedirection: false
   proxyThreads: 2
   undermoonImage: localhost:5000/undermoon_test

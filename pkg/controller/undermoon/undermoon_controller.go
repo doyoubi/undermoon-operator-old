@@ -169,6 +169,15 @@ func (r *ReconcileUndermoon) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
+	// Before scaling, we need to wait for those TERMINATING pods to be killed completely.
+	storageAllReadyAndStable, err := r.storageCon.storageAllReadyAndStable(resource.storageService, resource.storageStatefulSet, instance)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	if !storageAllReadyAndStable {
+		return reconcile.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
+	}
+
 	err = r.metaCon.changeMeta(reqLogger, masterBrokerAddress, instance, info)
 	if err != nil {
 		if err == errRetryReconciliation {

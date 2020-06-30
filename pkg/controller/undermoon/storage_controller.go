@@ -186,7 +186,26 @@ func (con *storageController) storageAllReady(storageService *corev1.Service, cr
 	}
 	serverProxyNum := int32(int(cr.Spec.ChunkNumber) * halfChunkNodeNumber)
 	ready := n >= int(serverProxyNum)
-	return ready, err
+	return ready, nil
+}
+
+func (con *storageController) storageAllReadyAndStable(storageService *corev1.Service, storageStatefulSet *appsv1.StatefulSet, cr *undermoonv1alpha1.Undermoon) (bool, error) {
+	ready, err := con.storageAllReady(storageService, cr)
+	if err != nil {
+		return false, err
+	}
+	if !ready {
+		return false, nil
+	}
+
+	statefulSetPodNum := *storageStatefulSet.Spec.Replicas
+	if storageStatefulSet.Status.CurrentReplicas != statefulSetPodNum {
+		return false, nil
+	}
+	if storageStatefulSet.Status.Replicas != statefulSetPodNum {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (con *storageController) getServerProxies(reqLogger logr.Logger, storageService *corev1.Service, cr *undermoonv1alpha1.Undermoon) ([]serverProxyMeta, error) {

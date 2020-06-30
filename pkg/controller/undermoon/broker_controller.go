@@ -133,7 +133,7 @@ func (con *memBrokerController) brokerAllReady(brokerStatefulSet *appsv1.Statefu
 		return false, err
 	}
 	ready := brokerStatefulSet.Status.ReadyReplicas == brokerNum && n >= int(brokerNum)
-	return ready, err
+	return ready, nil
 }
 
 func (con *memBrokerController) reconcileMaster(reqLogger logr.Logger, cr *undermoonv1alpha1.Undermoon, brokerService *corev1.Service) (string, []string, error) {

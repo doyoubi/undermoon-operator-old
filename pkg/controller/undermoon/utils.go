@@ -127,7 +127,7 @@ func genAntiAffinity(labels map[string]string, namespace, topologyKey string) *c
 	return &corev1.Affinity{
 		PodAntiAffinity: &corev1.PodAntiAffinity{
 			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-				corev1.WeightedPodAffinityTerm{
+				{
 					Weight: 2,
 					PodAffinityTerm: corev1.PodAffinityTerm{
 						LabelSelector: &metav1.LabelSelector{
@@ -138,6 +138,14 @@ func genAntiAffinity(labels map[string]string, namespace, topologyKey string) *c
 					},
 				},
 			},
+		},
+	}
+}
+
+func genPreStopHookLifeCycle(cmd []string) *corev1.Lifecycle {
+	return &corev1.Lifecycle{
+		PreStop: &corev1.Handler{
+			Exec: &corev1.ExecAction{Command: cmd},
 		},
 	}
 }
