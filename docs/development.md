@@ -125,14 +125,9 @@ Run the checker:
 > make install-undermoon-checker
 ```
 
-Get the error logs of the checker:
+Get the logs of the checker:
 ```
 > make checker-logs
-```
-
-See the logs of the checker:
-```
->
 ```
 
 Stop the checker

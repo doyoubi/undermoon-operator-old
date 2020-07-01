@@ -3,6 +3,10 @@ import aioredis
 from loguru import logger
 
 
+class RedisClientError(Exception):
+    pass
+
+
 class AioRedisClusterClient:
     def __init__(self, startup_nodes, timeout):
         self.startup_nodes = startup_nodes
@@ -56,10 +60,10 @@ class AioRedisClusterClient:
                 return await send_func(client), address
             except Exception as e:
                 if 'MOVED' not in str(e):
-                    raise Exception('{}: {}'.format(address, e))
+                    raise RedisClientError('{}: {} {}'.format(address, type(e), e))
                 if i == RETRY_TIMES - 1:
                     logger.error("exceed max redirection times: {}", tried_addressess)
-                    raise Exception("{}: {}".format(address, e))
+                    raise RedisClientError("{}: {}".format(address, e))
                 former_address = address
                 address = self.parse_moved(str(e))
                 logger.debug('moved {} -> {}', former_address, address)
@@ -69,6 +73,6 @@ class AioRedisClusterClient:
     def parse_moved(self, response):
         segs = response.split(' ')
         if len(segs) != 3:
-            raise Exception("invalid moved response {}".format(response))
+            raise RedisClientError("invalid moved response {}".format(response))
         address = segs[2]
         return address

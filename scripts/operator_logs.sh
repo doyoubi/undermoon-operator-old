@@ -1,2 +1,2 @@
-kubectl logs -f $(kubectl get pods -o name | grep undermoon-operator | grep -vi Terminating)
+kubectl logs -f $(kubectl get pods -o name | grep undermoon-operator | grep -v Terminating)
 

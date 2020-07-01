@@ -14,6 +14,10 @@ from cluster_client import AioRedisClusterClient
 MAX_SLOT = 16384
 
 
+class CheckerError(Exception):
+    pass
+
+
 class KeyValueChecker:
     MAX_KVS = 2000
 
@@ -106,7 +110,7 @@ class KeyValueChecker:
             if k != v:
                 logger.error('INCONSISTENT: key: {}, expected {}, got {}, address {}',
                     k, k, v, address)
-                raise Exception("INCONSISTENT DATA")
+                raise CheckerError("INCONSISTENT DATA")
 
         for k in self.deleted_kvs:
             try:
@@ -117,7 +121,7 @@ class KeyValueChecker:
             if v is not None:
                 logger.error('INCONSISTENT: key: {}, expected {}, got {}, address {}',
                     k, None, v, address)
-                raise Exception("INCONSISTENT DATA")
+                raise CheckerError("INCONSISTENT DATA")
 
     async def check_mget(self):
         for keys in group_by_slot(self.kvs):
@@ -131,7 +135,7 @@ class KeyValueChecker:
                 if k != v:
                     logger.error('INCONSISTENT: key: {}, expected {}, got {}, address {}',
                         k, k, v, address)
-                    raise Exception("INCONSISTENT DATA")
+                    raise CheckerError("INCONSISTENT DATA")
 
         for keys in group_by_slot(self.deleted_kvs):
             try:
@@ -143,7 +147,7 @@ class KeyValueChecker:
                 if v is not None:
                     logger.error('INCONSISTENT: key: {}, expected {}, got {}, address {}',
                         k, None, v, address)
-                    raise Exception("INCONSISTENT DATA")
+                    raise CheckerError("INCONSISTENT DATA")
 
     async def check_del(self):
         keys = list(self.kvs.pop() for _ in range(min(10, len(self.kvs))))
@@ -220,7 +224,7 @@ async def main(startup_nodes):
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        raise Exception("Missing service address")
+        raise CheckerError("Missing service address")
     address = sys.argv[1]
     print('startup address:', address)
     asyncio.run(main([address]))

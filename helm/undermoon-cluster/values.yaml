@@ -12,7 +12,7 @@ cluster:
 
 image:
   undermoonImage: localhost:5000/undermoon_test
-  undermoonImagePullPolicy: Always # IfNotPresent
+  undermoonImagePullPolicy: IfNotPresent
   redisImage: redis:5.0.9
 
 resources:
