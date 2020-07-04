@@ -46,17 +46,78 @@ async def randomly_scale(undermoon_cluster_name, chunk_number):
     stdout, stderr = await proc.communicate()
 
     if proc.returncode != 0:
-        logger.error('failed to change chunk number: {}'.format(stderr.decode()))
+        logger.error('failed to change chunk number: {}', stderr.decode())
     s = stdout.decode()
     if s:
-        logger.info(stdout.decode())
+        logger.info(s)
     s = stderr.decode()
     if s:
-        logger.info(stderr.decode())
+        logger.info(s)
+
+
+async def keep_randomly_killing(undermoon_cluster_name):
+    while True:
+        await randomly_kill(undermoon_cluster_name)
+        sleep_time = int(abs(random.gauss(0, 80) + 40))
+        await asyncio.sleep(sleep_time)
+
+
+async def randomly_kill(undermoon_cluster_name):
+    pods = await get_undermoon_pods(undermoon_cluster_name)
+    logger.info('pods: {}', pods)
+    if not pods:
+        return
+
+    killed_pod_name = random.choice(pods)
+    logger.info('killing {}'.format(killed_pod_name))
+    cmd = ['kubectl', 'delete', 'pod', killed_pod_name]
+
+    proc = await asyncio.create_subprocess_shell(
+        ' '.join(cmd),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE)
+    stdout, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        logger.error('failed to kill pod {}: {}', killed_pod_name, stderr.decode())
+    s = stdout.decode()
+    if s:
+        logger.info(s)
+    s = stderr.decode()
+    if s:
+        logger.info(s)
+
+
+async def get_undermoon_pods(undermoon_cluster_name):
+    cmd = ['kubectl', 'get', 'pods']
+    proc = await asyncio.create_subprocess_shell(
+        ' '.join(cmd),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE)
+    stdout, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        logger.error('failed to get pods: {}'.format(stderr.decode()))
+        return []
+
+    s = stdout.decode()
+    lines = s.split('\n')
+    pods = []
+    for line in lines:
+        if not line:
+            continue
+        pod_name = line.split(' ')[0]
+        if undermoon_cluster_name not in pod_name:
+            continue
+        pods.append(pod_name)
+    return pods
 
 
 async def main(undermoon_cluster_name):
-    await keep_randomly_scaling(undermoon_cluster_name)
+    await asyncio.gather(
+        keep_randomly_scaling(undermoon_cluster_name),
+        keep_randomly_killing(undermoon_cluster_name),
+    )
 
 
 if __name__ == '__main__':
