@@ -72,7 +72,7 @@ class KeyValueChecker:
             return
 
         t = int(time.time())
-        tag = "{" + str(random.randint(0, 10)) + "}"
+        tag = "{" + str(random.randint(0, 2)) + "}"
         keys = [
             "test:{}:tag{}:{}:{}".format(self.checker_name, tag, t, i)
             for i in range(10)
@@ -217,7 +217,7 @@ async def main(startup_nodes):
     try:
         await RandomChecker(startup_nodes, 10).run()
     except Exception as e:
-        logger.error("checker stopped", e, type(e))
+        logger.error("checker stopped {} {}", e, type(e))
 
     logger.info("checker stopped but it will keep running so that we can see the logs")
     while True:

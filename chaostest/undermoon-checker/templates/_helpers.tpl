@@ -23,3 +23,14 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{/*
+Decide which test script we are going to use.
+*/}}
+{{- define "undermoon-checker.test_script" -}}
+{{- if .Values.chaos }}
+{{- "chaos_checker_service.py" }}
+{{- else }}
+{{- "checker_service.py" }}
+{{- end }}
+{{- end }}

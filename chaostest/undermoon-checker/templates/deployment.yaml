@@ -18,7 +18,7 @@ spec:
           imagePullPolicy: {{ .Values.image.checkerImagePullPolicy }}
           command:
           - python
-          - check_service.py
+          - {{ include "undermoon-checker.test_script" . }}
           - "{{ .Values.undermoonServiceAddress }}"
           # For debugging
           # - sleep

@@ -16,9 +16,7 @@ class AioRedisClusterClient:
     @classmethod
     def group_by_slot(cls, keys):
         keys = [k for k in keys]
-        it = itertools.groupby(
-            keys, lambda k: crc16.crc16xmodem(k.encode("utf-8")) % cls.MAX_SLOT
-        )
+        it = itertools.groupby(keys, key_slot)
         for _, ks in it:
             yield list(ks)
 
@@ -98,3 +96,35 @@ class AioRedisClusterClient:
             raise RedisClientError("invalid moved response {}".format(response))
         address = segs[2]
         return address
+
+
+def gen_tag_key(key):
+    start = None
+    for i, c in enumerate(key):
+        if c == "{":
+            start = i
+            break
+    end = None
+    if start is not None:
+        for i in range(start, len(key)):
+            if key[i] == "}":
+                end = i
+                break
+    if end is None:
+        return key
+    return key[start + 1 : end]
+
+
+def key_slot(key):
+    key = gen_tag_key(key)
+    return crc16.crc16xmodem(key.encode("utf-8")) % AioRedisClusterClient.MAX_SLOT
+
+
+def test_gen_tag_key():
+    assert gen_tag_key("abc") == "abc"
+    assert gen_tag_key("ab{c") == "ab{c"
+    assert gen_tag_key("ab{}c") == ""
+    assert gen_tag_key("ab{233}c") == "233"
+
+
+test_gen_tag_key()

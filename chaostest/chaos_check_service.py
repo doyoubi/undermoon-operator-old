@@ -32,19 +32,26 @@ class CheckResult:
             res.not_consistent_count += r.not_consistent_count
         return res
 
+    def error_exists(self) -> bool:
+        return self.failed_count > 0 or self.not_consistent_count > 0
+
     def success_rate(self):
         s = self.success_count + self.failed_count
         if not s:
-            return "nil"
-        r = float(self.success_count) / s
-        return "{:.3f}".format(r)
+            return None
+        return float(self.success_count) / s
 
     def consistent_rate(self):
         s = self.consistent_count + self.not_consistent_count
         if not s:
-            return "nil"
-        r = float(self.consistent_count) / s
-        return "{:.3f}".format(r)
+            return None
+        return float(self.consistent_count) / s
+
+
+def format_rate(r) -> str:
+    if r is None:
+        return "nil"
+    return "{:.2f}%".format(r * 100)
 
 
 SUCCESS_RESULT = CheckResult(1, 0, 0, 0)
@@ -56,7 +63,7 @@ INCONSISTENT_RESULT = CheckResult(1, 0, 0, 1)
 # This checker won't stop on error
 # and just keep tracking the success rate and consistent rate.
 class ChaosKeyValueChecker:
-    MAX_KVS = 2000
+    MAX_KVS = 10000
 
     def __init__(self, checker_name, client):
         self.checker_name = checker_name
@@ -79,30 +86,30 @@ class ChaosKeyValueChecker:
                 results = await asyncio.gather(self.check_set(), self.check_mset(),)
                 set_result = results[0]
                 mset_result = results[1]
-                logger.info(
-                    "SET: success {} consistent {}",
-                    set_result.success_rate(),
-                    set_result.consistent_rate(),
-                )
-                logger.info(
-                    "MSET: success {} consistent {}",
-                    mset_result.success_rate(),
-                    set_result.consistent_rate(),
-                )
+                if set_result.error_exists():
+                    logger.info(
+                        "SET: success {}", format_rate(set_result.success_rate()),
+                    )
+                if mset_result.error_exists():
+                    logger.info(
+                        "MSET: success {}", format_rate(mset_result.success_rate()),
+                    )
             elif n < 8:
                 results = await asyncio.gather(self.check_get(), self.check_mget(),)
                 get_result = results[0]
                 mget_result = results[1]
-                logger.info(
-                    "GET: success {} consistent {}",
-                    get_result.success_rate(),
-                    get_result.consistent_rate(),
-                )
-                logger.info(
-                    "MGET: success {} consistent {}",
-                    mget_result.success_rate(),
-                    mget_result.consistent_rate(),
-                )
+                if get_result.error_exists():
+                    logger.info(
+                        "GET: success {} consistent {}",
+                        format_rate(get_result.success_rate()),
+                        format_rate(get_result.consistent_rate()),
+                    )
+                if mget_result.error_exists():
+                    logger.info(
+                        "MGET: success {} consistent {}",
+                        format_rate(mget_result.success_rate()),
+                        format_rate(mget_result.consistent_rate()),
+                    )
             else:
                 keys = list(self.kvs.pop() for _ in range(min(10, len(self.kvs))))
                 half = len(keys) // 2
@@ -112,16 +119,15 @@ class ChaosKeyValueChecker:
                 )
                 del_result = results[0]
                 del_multi_result = results[1]
-                logger.info(
-                    "DEL: success {} consistent {}",
-                    del_result.success_rate(),
-                    del_result.consistent_rate(),
-                )
-                logger.info(
-                    "DEL multi: success {} consistent {}",
-                    del_multi_result.success_rate(),
-                    del_multi_result.consistent_rate(),
-                )
+                if del_result.error_exists():
+                    logger.info(
+                        "DEL: success {}", format_rate(del_result.success_rate()),
+                    )
+                if del_multi_result.error_exists():
+                    logger.info(
+                        "DEL multi: success {}",
+                        format_rate(del_multi_result.success_rate()),
+                    )
         except Exception as e:
             logger.exception("REDIS_TEST_FAILED: {} {}", e, type(e))
             raise
@@ -154,7 +160,7 @@ class ChaosKeyValueChecker:
             return
 
         t = get_current_time()
-        tag = "{" + str(random.randint(0, 10)) + "}"
+        tag = "{" + str(random.randint(0, 2)) + "}"
         keys = [
             "test:{}:tag{}:{}:{}".format(self.checker_name, tag, t, i)
             for i in range(10)
@@ -177,7 +183,7 @@ class ChaosKeyValueChecker:
 
     async def check_get(self) -> CheckResult:
         res = CheckResult(0, 0, 0, 0)
-        for ks in group_list(self.kvs, 10):
+        for ks in list(group_list(self.kvs, 10)):
             futs = [self.check_get_single_key(k) for k in ks]
             results = await asyncio.gather(*futs)
             results.append(res)
@@ -198,6 +204,7 @@ class ChaosKeyValueChecker:
                 value,
                 address,
             )
+            self.kvs.discard(key)
             return INCONSISTENT_RESULT
         return CONSISTENT_RESULT
 
@@ -222,6 +229,7 @@ class ChaosKeyValueChecker:
                         address,
                     )
                     res.not_consistent_count += 1
+                    self.kvs.discard(k)
                 else:
                     res.consistent_count += 1
 
@@ -243,6 +251,7 @@ class ChaosKeyValueChecker:
                         address,
                     )
                     res.not_consistent_count += 1
+                    self.kvs.discard(k)
                 else:
                     res.consistent_count += 1
 
@@ -250,7 +259,7 @@ class ChaosKeyValueChecker:
 
     async def check_del_keys(self, keys):
         res = CheckResult(0, 0, 0, 0)
-        for ks in group_list(keys, 10):
+        for ks in list(group_list(keys, 10)):
             futs = [self.check_del_multi_keys([k]) for k in ks]
             results = await asyncio.gather(*futs)
             results.append(res)
@@ -321,7 +330,7 @@ async def main(startup_nodes):
     try:
         await ChaosRandomChecker(startup_nodes, 3).run()
     except Exception as e:
-        logger.error("checker stopped", e, type(e))
+        logger.exception("checker stopped {} {}", e, type(e))
 
 
 if __name__ == "__main__":
