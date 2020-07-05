@@ -26,6 +26,11 @@ lint:
 	helm lint helm/undermoon-cluster --strict
 	helm lint chaostest/undermoon-checker --strict
 
+lint-chaostest-script:
+	# pip install -r chaostest/ctrl_requirements.txt
+	black chaostest
+	pylint --errors-only chaostest
+
 HELM_CHARTS_CRD_FILE=helm/undermoon-operator/templates/undermoon.operator.api_undermoons_crd.yaml
 HELM_CHARTS_RBAC_FILE=helm/undermoon-operator/templates/operator-rbac.yaml
 

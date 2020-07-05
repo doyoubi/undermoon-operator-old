@@ -1,5 +1,8 @@
 import random
+import itertools
+
 import aioredis
+import crc16
 from loguru import logger
 
 
@@ -8,10 +11,22 @@ class RedisClientError(Exception):
 
 
 class AioRedisClusterClient:
-    def __init__(self, startup_nodes, timeout):
+    MAX_SLOT = 16384
+
+    @classmethod
+    def group_by_slot(cls, keys):
+        keys = [k for k in keys]
+        it = itertools.groupby(
+            keys, lambda k: crc16.crc16xmodem(k.encode("utf-8")) % cls.MAX_SLOT
+        )
+        for _, ks in it:
+            yield list(ks)
+
+    def __init__(self, startup_nodes, timeout, debug=False):
         self.startup_nodes = startup_nodes
         self.client_map = {}
         self.timeout = timeout
+        self.debug = debug
 
     async def init_pool(self):
         for address in self.startup_nodes:
@@ -20,14 +35,20 @@ class AioRedisClusterClient:
     async def get_or_create_client(self, address):
         if address not in self.client_map:
             client = await aioredis.create_redis_pool(
-                'redis://{}'.format(address),
-                timeout=self.timeout,
-                )
-            self.client_map[address] = client
+                "redis://{}".format(address), timeout=self.timeout,
+            )
+            # Other coroutine may have already created
+            # when we're creating redis pool.
+            # Check again
+            if address not in self.client_map:
+                self.client_map[address] = client
+            else:
+                client.close()
+                await client.wait_closed()
         return self.client_map[address]
 
     async def get(self, key):
-        return await self.exec(lambda client: client.get(key, encoding='utf-8'))
+        return await self.exec(lambda client: client.get(key, encoding="utf-8"))
 
     async def set(self, key, value):
         return await self.exec(lambda client: client.set(key, value))
@@ -36,12 +57,12 @@ class AioRedisClusterClient:
         return await self.exec(lambda client: client.delete(key, *keys))
 
     async def mget(self, key, *keys):
-        return await self.exec(lambda client: client.mget(key, *keys, encoding='utf-8'))
+        return await self.exec(lambda client: client.mget(key, *keys, encoding="utf-8"))
 
     async def mset(self, *kvs):
         return await self.exec(lambda client: client.mset(*kvs))
 
-    async def exec(self, send_func) :
+    async def exec(self, send_func):
         address = random.choice(self.startup_nodes)
         client = await self.get_or_create_client(address)
 
@@ -59,19 +80,20 @@ class AioRedisClusterClient:
             try:
                 return await send_func(client), address
             except Exception as e:
-                if 'MOVED' not in str(e):
-                    raise RedisClientError('{}: {} {}'.format(address, type(e), e))
+                if "MOVED" not in str(e):
+                    raise RedisClientError("{}: {} {}".format(address, type(e), e))
                 if i == RETRY_TIMES - 1:
                     logger.error("exceed max redirection times: {}", tried_addressess)
                     raise RedisClientError("{}: {}".format(address, e))
                 former_address = address
                 address = self.parse_moved(str(e))
-                logger.debug('moved {} -> {}', former_address, address)
+                if self.debug:
+                    logger.debug("moved {} -> {}", former_address, address)
                 client = await self.get_or_create_client(address)
                 tried_addressess.append(address)
 
     def parse_moved(self, response):
-        segs = response.split(' ')
+        segs = response.split(" ")
         if len(segs) != 3:
             raise RedisClientError("invalid moved response {}".format(response))
         address = segs[2]

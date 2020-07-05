@@ -3,15 +3,10 @@ import time
 import random
 import signal
 import asyncio
-import itertools
 
-import crc16
 from loguru import logger
 
 from cluster_client import AioRedisClusterClient
-
-
-MAX_SLOT = 16384
 
 
 class CheckerError(Exception):
@@ -29,8 +24,7 @@ class KeyValueChecker:
 
     async def loop_check(self):
         while True:
-            if len(self.kvs) >= self.MAX_KVS or \
-                    len(self.deleted_kvs) >= self.MAX_KVS:
+            if len(self.kvs) >= self.MAX_KVS or len(self.deleted_kvs) >= self.MAX_KVS:
                 await self.del_keys(self.kvs)
                 return
             await self.checker_key_value()
@@ -41,18 +35,16 @@ class KeyValueChecker:
             n = random.randint(0, 10)
             if n < 4:
                 await asyncio.gather(
-                    self.check_set(),
-                    self.check_mset(),
+                    self.check_set(), self.check_mset(),
                 )
             elif n < 8:
                 await asyncio.gather(
-                    self.check_get(),
-                    self.check_mget(),
+                    self.check_get(), self.check_mget(),
                 )
             else:
                 await self.check_del()
         except Exception as e:
-            logger.error('REDIS_TEST_FAILED: {} {}', e, type(e))
+            logger.error("REDIS_TEST_FAILED: {} {}", e, type(e))
             raise
 
     async def check_set(self):
@@ -61,14 +53,16 @@ class KeyValueChecker:
 
         t = int(time.time())
         for i in range(10):
-            k = 'test:{}:{}:{}'.format(self.checker_name, t, i)
+            k = "test:{}:{}:{}".format(self.checker_name, t, i)
             try:
                 res, address = await self.client.set(k, k)
             except Exception as e:
-                logger.error('REDIS_TEST: failed to set {}: {} {}', k, e, type(e))
+                logger.error("REDIS_TEST: failed to set {}: {} {}", k, e, type(e))
                 raise
             if not res:
-                logger.info('REDIS_TEST: invalid response: {} address: {}', res, address)
+                logger.info(
+                    "REDIS_TEST: invalid response: {} address: {}", res, address
+                )
                 continue
             self.kvs.add(k)
             self.deleted_kvs.discard(k)
@@ -78,83 +72,100 @@ class KeyValueChecker:
             return
 
         t = int(time.time())
-        keys = []
-        for i in range(10):
-            k = 'test:{}:{}:{}'.format(self.checker_name, t, i)
-            keys.append(k)
+        tag = "{" + str(random.randint(0, 10)) + "}"
+        keys = [
+            "test:{}:tag{}:{}:{}".format(self.checker_name, tag, t, i)
+            for i in range(10)
+        ]
+        kvs = []
+        for k in keys:
+            kvs.extend([k, k])
+        try:
+            res, address = await self.client.mset(*kvs)
+        except Exception as e:
+            logger.error("REDIS_TEST: failed to mset {}: {} {}", keys, e, type(e))
+            raise
+        if not res:
+            logger.info("REDIS_TEST: invalid response: {} address: {}", res, address)
+            return
 
-        for ks in group_by_slot(keys):
-            kvs = []
-            for k in ks:
-                kvs.extend([k, k])
-            try:
-                res, address = await self.client.mset(*kvs)
-            except Exception as e:
-                logger.error('REDIS_TEST: failed to mset {}: {} {}', ks, e, type(e))
-                raise
-
-            if not res:
-                logger.info('REDIS_TEST: invalid response: {} address: {}', res, address)
-                return
-
-            self.kvs.update(ks)
-            self.deleted_kvs.difference_update(ks)
+        self.kvs.update(keys)
+        self.deleted_kvs.difference_update(keys)
 
     async def check_get(self):
         for k in self.kvs:
             try:
                 v, address = await self.client.get(k)
             except Exception as e:
-                logger.error('REDIS_TEST: failed to get {}: {} {}', k, e, type(e))
+                logger.error("REDIS_TEST: failed to get {}: {} {}", k, e, type(e))
                 raise
             if k != v:
-                logger.error('INCONSISTENT: key: {}, expected {}, got {}, address {}',
-                    k, k, v, address)
+                logger.error(
+                    "INCONSISTENT: key: {}, expected {}, got {}, address {}",
+                    k,
+                    k,
+                    v,
+                    address,
+                )
                 raise CheckerError("INCONSISTENT DATA")
 
         for k in self.deleted_kvs:
             try:
                 v, address = await self.client.get(k)
             except Exception as e:
-                logger.error('REDIS_TEST: failed to get {}: {} {}', k, e, type(e))
+                logger.error("REDIS_TEST: failed to get {}: {} {}", k, e, type(e))
                 raise
             if v is not None:
-                logger.error('INCONSISTENT: key: {}, expected {}, got {}, address {}',
-                    k, None, v, address)
+                logger.error(
+                    "INCONSISTENT: key: {}, expected {}, got {}, address {}",
+                    k,
+                    None,
+                    v,
+                    address,
+                )
                 raise CheckerError("INCONSISTENT DATA")
 
     async def check_mget(self):
-        for keys in group_by_slot(self.kvs):
+        for keys in AioRedisClusterClient.group_by_slot(self.kvs):
             try:
                 values, address = await self.client.mget(*keys)
             except Exception as e:
-                logger.error('REDIS_TEST: failed to mget {}: {} {}', keys, e, type(e))
+                logger.error("REDIS_TEST: failed to mget {}: {} {}", keys, e, type(e))
                 raise
 
             for k, v in zip(keys, values):
                 if k != v:
-                    logger.error('INCONSISTENT: key: {}, expected {}, got {}, address {}',
-                        k, k, v, address)
+                    logger.error(
+                        "INCONSISTENT: key: {}, expected {}, got {}, address {}",
+                        k,
+                        k,
+                        v,
+                        address,
+                    )
                     raise CheckerError("INCONSISTENT DATA")
 
-        for keys in group_by_slot(self.deleted_kvs):
+        for keys in AioRedisClusterClient.group_by_slot(self.deleted_kvs):
             try:
                 values, address = await self.client.mget(*keys)
             except Exception as e:
-                logger.error('REDIS_TEST: failed to get {}: {} {}', keys, e, type(e))
+                logger.error("REDIS_TEST: failed to get {}: {} {}", keys, e, type(e))
                 raise
             for k, v in zip(keys, values):
                 if v is not None:
-                    logger.error('INCONSISTENT: key: {}, expected {}, got {}, address {}',
-                        k, None, v, address)
+                    logger.error(
+                        "INCONSISTENT: key: {}, expected {}, got {}, address {}",
+                        k,
+                        None,
+                        v,
+                        address,
+                    )
                     raise CheckerError("INCONSISTENT DATA")
 
     async def check_del(self):
         keys = list(self.kvs.pop() for _ in range(min(10, len(self.kvs))))
         half = len(keys) // 2
         await asyncio.gather(
-            self.del_keys(keys[:half]),
-            self.del_multi_keys(keys[half:]),
+            self.del_keys(keys[:half]), self.del_multi_keys(keys[half:]),
         )
 
     async def del_keys(self, keys):
@@ -162,11 +173,11 @@ class KeyValueChecker:
             await self.del_multi_keys([k])
 
     async def del_multi_keys(self, keys):
-        for ks in group_by_slot(keys):
+        for ks in AioRedisClusterClient.group_by_slot(keys):
             try:
                 values, address = await self.client.delete(*ks)
             except Exception as e:
-                logger.error('REDIS_TEST: failed to del {}: {} {}', ks, e, type(e))
+                logger.error("REDIS_TEST: failed to del {}: {} {}", ks, e, type(e))
                 raise
             self.kvs.difference_update(ks)
             self.deleted_kvs.update(ks)
@@ -195,36 +206,27 @@ class RandomChecker:
         while True:
             checker = KeyValueChecker(checker_name, client)
             await checker.loop_check()
-            logger.info('checker {} restart'.format(checker_name))
+            logger.info("checker {} restart".format(checker_name))
 
     async def run(self):
-        checkers = [self.run_one_checker(str(i)) \
-            for i in range(self.concurrent_num)]
+        checkers = [self.run_one_checker(str(i)) for i in range(self.concurrent_num)]
         await asyncio.gather(*checkers)
-
-
-def group_by_slot(keys):
-    keys = [k for k in keys]
-    it = itertools.groupby(keys,
-        lambda k: crc16.crc16xmodem(k.encode('utf-8')) % MAX_SLOT)
-    for _, ks in it:
-        yield list(ks)
 
 
 async def main(startup_nodes):
     try:
         await RandomChecker(startup_nodes, 10).run()
     except Exception as e:
-        logger.error('checker stopped', e, type(e))
+        logger.error("checker stopped", e, type(e))
 
-    logger.info('checker stopped but it will keep running so that we can see the logs')
+    logger.info("checker stopped but it will keep running so that we can see the logs")
     while True:
         await asyncio.sleep(3600)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) != 2:
         raise CheckerError("Missing service address")
     address = sys.argv[1]
-    print('startup address:', address)
+    print("startup address:", address)
     asyncio.run(main([address]))
