@@ -251,7 +251,8 @@ class ChaosKeyValueChecker:
                         address,
                     )
                     res.not_consistent_count += 1
-                    self.kvs.discard(k)
+                    self.deleted_kvs.discard(k)
+                    self.kvs.add(k)
                 else:
                     res.consistent_count += 1
 

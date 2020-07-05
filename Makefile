@@ -111,6 +111,10 @@ install-undermoon-checker:
 	helm package chaostest/undermoon-checker
 	helm install example-checker "undermoon-checker-$(CHECKER_HELM_VERSION).tgz"
 
+install-undermoon-chaos-checker:
+	helm package chaostest/undermoon-checker
+	helm install --set chaos=true example-checker "undermoon-checker-$(CHECKER_HELM_VERSION).tgz"
+
 uninstall-undermoon-checker:
 	helm uninstall example-checker
 
