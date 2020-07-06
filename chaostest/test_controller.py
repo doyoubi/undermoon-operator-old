@@ -107,16 +107,20 @@ async def get_undermoon_pods(undermoon_cluster_name):
     return pods
 
 
-async def main(undermoon_cluster_name):
-    await asyncio.gather(
+async def main(undermoon_cluster_name, enable_killing):
+    futs = [
         keep_randomly_scaling(undermoon_cluster_name),
-        keep_randomly_killing(undermoon_cluster_name),
-    )
+    ]
+    if enable_killing:
+        futs.append(keep_randomly_killing(undermoon_cluster_name))
+    await asyncio.gather(*futs)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        raise Exception("Missing undermoon cluster name")
+    if len(sys.argv) != 3:
+        raise Exception("Missing undermoon cluster name or killing flag")
     undermoon_cluster_name = sys.argv[1]
+    enable_killing = sys.argv[2] == "enable-killing"
     print("undermoon cluster name:", undermoon_cluster_name)
-    asyncio.run(main(undermoon_cluster_name))
+    print("enable killing: ", enable_killing)
+    asyncio.run(main(undermoon_cluster_name, enable_killing))

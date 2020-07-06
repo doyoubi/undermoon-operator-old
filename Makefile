@@ -1,17 +1,21 @@
+OPERATOR_VERSION="v0.0.1"
+OPERATOR_HELM_VERSION="0.1.0"
+CHECKER_HELM_VERSION="0.1.0"
+
 build:
 	operator-sdk build undermoon-operator:$(OPERATOR_VERSION)
 	helm package helm/undermoon-operator
 	helm package helm/undermoon-cluster
 
-OPERATOR_VERSION="v0.0.1"
-OPERATOR_HELM_VERSION="0.1.0"
-CHECKER_HELM_VERSION="0.1.0"
-
 install-helm-package:
 	helm package helm/undermoon-operator
 	helm package helm/undermoon-cluster
-	helm install example-operator "undermoon-operator-$(OPERATOR_HELM_VERSION).tgz"
-	helm install example-undermoon "undermoon-cluster-$(OPERATOR_HELM_VERSION).tgz"
+	helm install \
+		--set "image.operatorImage=localhost:5000/undermoon_test" \
+		example-operator "undermoon-operator-$(OPERATOR_HELM_VERSION).tgz"
+	helm install \
+		--set "image.undermoonImage=localhost:5000/undermoon-operator:$(OPERATOR_VERSION)" \
+		example-undermoon "undermoon-cluster-$(OPERATOR_HELM_VERSION).tgz"
 
 uninstall-helm-package:
 	helm uninstall example-undermoon || true
@@ -31,6 +35,8 @@ lint-chaostest-script:
 	black chaostest
 	pylint --errors-only chaostest
 
+OPERATOR_CRD_FILE=deploy/crds/undermoon.operator.api_undermoons_crd.yaml
+OPERATOR_CR_FILE=deploy/crds/undermoon.operator.api_v1alpha1_undermoon_cr.yaml
 HELM_CHARTS_CRD_FILE=helm/undermoon-operator/templates/undermoon.operator.api_undermoons_crd.yaml
 HELM_CHARTS_RBAC_FILE=helm/undermoon-operator/templates/operator-rbac.yaml
 
@@ -38,8 +44,8 @@ update-types:
 	operator-sdk generate k8s
 	operator-sdk generate crds
 	# Update crd file in Helm Charts
-	echo '# DO NOT MODIFY! This file is copied from deploy/crds/undermoon.operator.api_undermoons_crd.yaml' > $(HELM_CHARTS_CRD_FILE)
-	cat deploy/crds/undermoon.operator.api_undermoons_crd.yaml >> $(HELM_CHARTS_CRD_FILE)
+	echo '# DO NOT MODIFY! This file is copied from $(OPERATOR_CRD_FILE)' > $(HELM_CHARTS_CRD_FILE)
+	cat $(OPERATOR_CRD_FILE) >> $(HELM_CHARTS_CRD_FILE)
 	echo '# DO NOT MODIFY! This file is generated from several files in deploy/' > $(HELM_CHARTS_RBAC_FILE)
 	cat deploy/service_account.yaml >> $(HELM_CHARTS_RBAC_FILE)
 	echo '---' >> $(HELM_CHARTS_RBAC_FILE)
@@ -62,7 +68,7 @@ debug-build:
 	docker push localhost:5000/undermoon-operator:$(OPERATOR_VERSION)
 
 debug-run:
-	kubectl create -f deploy/crds/undermoon.operator.api_undermoons_crd.yaml
+	kubectl create -f $(OPERATOR_CRD_FILE)
 	# run operator
 	kubectl create -f deploy/service_account.yaml
 	kubectl create -f deploy/role.yaml
@@ -73,11 +79,11 @@ debug-logs:
 	./scripts/operator_logs.sh
 
 debug-start:
-	kubectl apply -f deploy/crds/undermoon.operator.api_v1alpha1_undermoon_cr.yaml
+	kubectl apply -f $(OPERATOR_CR_FILE)
 
 debug-stop:
-	kubectl delete -f deploy/crds/undermoon.operator.api_v1alpha1_undermoon_cr.yaml || true
-	kubectl delete -f deploy/crds/undermoon.operator.api_undermoons_crd.yaml || true
+	kubectl delete -f $(OPERATOR_CR_FILE) || true
+	kubectl delete -f $(OPERATOR_CRD_FILE) || true
 	kubectl delete -f deploy/operator.yaml || true
 	kubectl delete -f deploy/role_binding.yaml || true
 	kubectl delete -f deploy/role.yaml || true
@@ -120,6 +126,12 @@ uninstall-undermoon-checker:
 
 checker-logs:
 	./scripts/checker_logs.sh
+
+test-ctrl:
+	python chaostest/test_controller.py example-undermoon disable-killing
+
+test-chaos-ctrl:
+	python chaostest/test_controller.py example-undermoon enable-killing
 
 .PHONY: build test lint update-types minikube-env debug-run debug-start debug-stop
 

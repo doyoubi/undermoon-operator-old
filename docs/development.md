@@ -106,7 +106,7 @@ Run `redis-cli` to access the redis cluster service:
 The chao test uses Helm Charts package.
 
 There's a checker service that will keep accessing the cluster
-and check the data. The checker will stop once it finds some errors.
+and check the data.
 Note that due to limited resources in PC,
 failover could happen and cause `INCONSISTENT DATA` error.
 
@@ -120,14 +120,30 @@ Install the operator and create the Undermoon CRD:
 > make install-helm-package
 ```
 
-Run the checker:
+Run the checker that stops on error:
 ```
 > make install-undermoon-checker
+```
+
+Or run the checker that doesn't stop on error and keeps printing success rate:
+```
+> make install-undermoon-chaos-checker
 ```
 
 Get the logs of the checker:
 ```
 > make checker-logs
+```
+
+Then we can keep scaling the cluster and create some failures:
+```
+> pip install -r chaostest/ctrl_requirements.txt
+
+# Run without killing pods
+> make test-ctrl
+
+# Run with killing pods
+> make test-chaos-ctrl
 ```
 
 Stop the checker
