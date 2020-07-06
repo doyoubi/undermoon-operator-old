@@ -2,8 +2,14 @@ OPERATOR_VERSION="v0.0.1"
 OPERATOR_HELM_VERSION="0.1.0"
 CHECKER_HELM_VERSION="0.1.0"
 
-build:
+build: build-image build-helm
+	echo "build done"
+
+build-image:
+	echo "building undermoon-operator:$(OPERATOR_VERSION)"
 	operator-sdk build undermoon-operator:$(OPERATOR_VERSION)
+
+build-helm:
 	helm package helm/undermoon-operator
 	helm package helm/undermoon-cluster
 
@@ -11,10 +17,10 @@ install-helm-package:
 	helm package helm/undermoon-operator
 	helm package helm/undermoon-cluster
 	helm install \
-		--set "image.operatorImage=localhost:5000/undermoon_test" \
+		--set "image.operatorImage=localhost:5000/undermoon-operator:$(OPERATOR_VERSION)" \
 		example-operator "undermoon-operator-$(OPERATOR_HELM_VERSION).tgz"
 	helm install \
-		--set "image.undermoonImage=localhost:5000/undermoon-operator:$(OPERATOR_VERSION)" \
+		--set "image.undermoonImage=localhost:5000/undermoon_test" \
 		example-undermoon "undermoon-cluster-$(OPERATOR_HELM_VERSION).tgz"
 
 uninstall-helm-package:
