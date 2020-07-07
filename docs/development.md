@@ -1,5 +1,8 @@
 # Development
 
+## Prerequisites
+Need to install [operator-sdk](https://sdk.operatorframework.io/docs/install-operator-sdk/) first.
+
 ## Basics
 
 After modifying the `undermoon_types.go` file,

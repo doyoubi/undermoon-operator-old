@@ -180,9 +180,9 @@ func (client *brokerClient) deregisterServerProxy(address string, proxyAddress s
 		return err
 	}
 
-	if res.StatusCode() != 200 && res.StatusCode() != 400 {
+	if res.StatusCode() != 200 && res.StatusCode() != 404 {
 		content := res.Body()
-		return errors.Errorf("Failed to register server proxy: invalid status code %d: %s", res.StatusCode(), string(content))
+		return errors.Errorf("Failed to deregister server proxy: invalid status code %d: %s", res.StatusCode(), string(content))
 	}
 
 	return nil
