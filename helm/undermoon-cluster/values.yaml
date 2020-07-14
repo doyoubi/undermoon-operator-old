@@ -11,7 +11,7 @@ cluster:
   proxyThreads: 2
 
 image:
-  undermoonImage: doyoubi/undermoon:0.3.1-alpha.0-buster
+  undermoonImage: doyoubi/undermoon:0.3.1-buster
   undermoonImagePullPolicy: IfNotPresent
   redisImage: redis:5.0.9
 
