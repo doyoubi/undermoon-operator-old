@@ -324,7 +324,8 @@ def group_list(l, group_size):
         if len(group) == group_size:
             yield group
             group = []
-    yield group
+    if group:
+        yield group
 
 
 async def main(startup_nodes):
