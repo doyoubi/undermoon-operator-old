@@ -1,4 +1,7 @@
-# Undermoon Operator
+# Undermoon Operator (MOVED)
+
+**This repo is moved to [undermoon-operator](https://github.com/doyoubi/undermoon-operator)**
+
 Kubernetes operator for easy `Redis Cluster` management
 based on [undermoon](https://github.com/doyoubi/undermoon)
 using [operator-sdk](https://sdk.operatorframework.io/).
